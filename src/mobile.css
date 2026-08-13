@@ -1,0 +1,155 @@
+/* Shopee-style styling system for Project 5 - Mobile Specific Overrides */
+@media (max-width: 767px) {
+  .desktop-only {
+    display: none !important;
+  }
+  
+  .mobile-only {
+    display: block !important;
+  }
+  
+  .header-actions .mobile-only {
+    display: inline-flex !important;
+  }
+  
+  header {
+    padding: 8px 12px;
+  }
+  
+  .brand-title {
+    font-size: 1.1rem;
+  }
+  
+  .verification-panel {
+    padding: 6px 12px;
+  }
+  
+  .verification-container {
+    gap: 6px;
+  }
+  
+  .main-wrapper {
+    padding: 8px 12px;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .brand-tabs-scroll {
+    gap: 6px;
+    padding-bottom: 6px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
+    touch-action: pan-x !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .brand-tab {
+    padding: 6px 12px;
+    font-size: 0.725rem;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    touch-action: manipulation !important;
+  }
+  
+  .brand-group {
+    gap: 6px;
+  }
+  
+  .brand-group-header {
+    margin-top: 2px;
+    font-size: 0.9rem;
+    padding-left: 6px;
+  }
+  
+  .products-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .product-card {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .product-card-info {
+    padding: 6px;
+    gap: 2px;
+  }
+  
+  .product-card-title {
+    font-size: 0.725rem;
+    line-height: 1.2;
+    height: 2.4em;
+  }
+  
+  .product-card-specs {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+  }
+  
+  .product-card-price {
+    font-size: 0.75rem;
+    margin-top: 2px;
+  }
+  
+  .btn-card-add {
+    padding: 4px 8px;
+    font-size: 0.675rem;
+    margin-top: 4px;
+  }
+
+  .brand-title.mobile-hidden {
+    display: none !important;
+  }
+  
+  .mobile-search-wrapper {
+    position: relative;
+    display: none;
+    flex-grow: 0;
+    width: 0;
+    opacity: 0;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, flex-grow 0.4s ease;
+    overflow: hidden;
+  }
+  
+  .mobile-search-wrapper.active {
+    display: flex !important;
+    flex-grow: 1;
+    width: 100%;
+    opacity: 1;
+    margin-right: 8px;
+  }
+  
+  .mobile-search-wrapper input {
+    width: 100%;
+    padding: 8px 36px 8px 12px;
+    border: none;
+    border-radius: 4px;
+    outline: none;
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    background-color: var(--white);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .mobile-search-clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-gray);
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
