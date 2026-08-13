@@ -152,4 +152,11 @@
     align-items: center;
     justify-content: center;
   }
+
+  .sticky-tabs-container {
+    top: 48px;
+    padding: 6px 0;
+    margin-top: -6px;
+    margin-bottom: 8px;
+  }
 }

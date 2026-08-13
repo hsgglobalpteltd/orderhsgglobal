@@ -70,7 +70,7 @@ export default function App() {
   // Search & Filter states
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeBrandId, setActiveBrandId] = React.useState<string>("all");
-  const [activeCategoryId, setActiveCategoryId] = React.useState<string>("all");
+  const [activeCategoryId, setActiveCategoryId] = React.useState<string>("Cooking Paste");
   const [showMobileSearch, setShowMobileSearch] = React.useState(false);
 
   // Retailer Verification states
@@ -396,6 +396,7 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
 
   // Extract unique categories from products
   const categories = React.useMemo(() => {
@@ -746,42 +747,26 @@ export default function App() {
             <span>{error}</span>
           </div>
         )}
-        {/* Category categories scrolling bar */}
-        <div className="brand-tabs-scroll mb-2">
-          <button
-            onClick={() => setActiveCategoryId("all")}
-            className={`brand-tab ${activeCategoryId === "all" ? "active" : ""}`}
-          >
-            All Categories
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => setActiveCategoryId(c)}
-              className={`brand-tab ${activeCategoryId === c ? "active" : ""}`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-
-        {/* Brand categories scrolling bar */}
-        <div className="brand-tabs-scroll">
-          <button
-            onClick={() => setActiveBrandId("all")}
-            className={`brand-tab ${activeBrandId === "all" ? "active" : ""}`}
-          >
-            All Brands
-          </button>
-          {filteredBrands.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => setActiveBrandId(b.id)}
-              className={`brand-tab ${activeBrandId === b.id ? "active" : ""}`}
-            >
-              {b.display_name}
-            </button>
-          ))}
+        {/* Sticky category tabs container */}
+        <div className="sticky-tabs-container">
+          {/* Category categories scrolling bar */}
+          <div className="brand-tabs-scroll tabs-scroll-center">
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => {
+                  if (activeCategoryId === c) {
+                    setActiveCategoryId("all");
+                  } else {
+                    setActiveCategoryId(c);
+                  }
+                }}
+                className={`brand-tab ${activeCategoryId === c ? "active" : ""}`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Catalog Lists loading block */}
