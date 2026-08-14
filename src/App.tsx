@@ -287,10 +287,19 @@ export default function App() {
     e.preventDefault();
     if (cart.length === 0) return;
 
+    const currentSubmitType = verifiedRetailer ? submitType : "quote";
+    if (currentSubmitType === "order") {
+      const totalOrderCartons = cart.filter((item) => item.mode === "order").reduce((a, b) => a + b.quantity, 0);
+      if (totalOrderCartons < 4) {
+        showToast("Minimum Order is 4 cartons per delivery!", "warning");
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const payload: any = {
-        type: verifiedRetailer ? submitType : "quote",
+        type: currentSubmitType,
         items: cart.map((item) => ({
           sku: item.product.sku,
           carton_qty: item.quantity
@@ -618,7 +627,7 @@ export default function App() {
 
   // RENDER: Catalog View
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50 pb-20">
+    <div className="min-h-screen flex flex-col bg-zinc-50 pb-36">
       
       {/* Search Header */}
       <header>
@@ -833,6 +842,21 @@ export default function App() {
             })}
           </div>
         )}
+
+        {/* Terms and Conditions Footer */}
+        <footer className="tc-footer">
+          <div className="tc-sticky-note">
+            <h4>Terms & Conditions</h4>
+            <ul>
+              <li><strong>Delivery Timeline:</strong> Standard delivery completed within a maximum of 4 working days.</li>
+              <li><strong>Urgent Requests:</strong> Urgent delivery requirements must be negotiated directly prior to submission.</li>
+              <li><strong>Minimum Quantity:</strong> Orders are subject to a strict minimum of 4 cartons per delivery.</li>
+              <li><strong>Pricing:</strong> Item prices are based on established B2B commercial agreements.</li>
+              <li><strong>Payment Terms:</strong> Settlements must comply with established B2B contractual agreements.</li>
+            </ul>
+          </div>
+        </footer>
+
       </div>
 
       {/* Swipeable Product Detail Modal */}
@@ -1008,6 +1032,11 @@ export default function App() {
               </div>
               <button
                 onClick={() => {
+                  const totalOrderCartons = cart.filter((item) => item.mode === "order").reduce((a, b) => a + b.quantity, 0);
+                  if (totalOrderCartons < 4) {
+                    showToast("Minimum Order is 4 cartons per delivery!", "warning");
+                    return;
+                  }
                   setIsCartOpen(false);
                   setSubmitType("order");
                   setShowCheckoutModal(true);
