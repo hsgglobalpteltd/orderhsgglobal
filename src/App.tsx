@@ -1356,9 +1356,31 @@ export default function App() {
 
       {/* Floating Toast Notification overlay */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[300] bg-zinc-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          {toast.type === "success" && <span className="text-green-400">✓</span>}
-          {toast.type === "error" && <span className="text-red-400">✗</span>}
+        <div 
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 9999,
+            backgroundColor: "#18181b",
+            color: "#ffffff",
+            fontSize: "12px",
+            fontWeight: "600",
+            padding: "10px 18px",
+            borderRadius: "9999px",
+            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            pointerEvents: "none",
+            boxSizing: "border-box",
+            whiteSpace: "nowrap"
+          }}
+        >
+          {toast.type === "success" && <span style={{ color: "#4ade80", fontWeight: "bold" }}>✓</span>}
+          {toast.type === "error" && <span style={{ color: "#f87171", fontWeight: "bold" }}>✗</span>}
+          {toast.type === "warning" && <span style={{ color: "#fbbf24", fontWeight: "bold" }}>⚠</span>}
           <span>{toast.message}</span>
         </div>
       )}
