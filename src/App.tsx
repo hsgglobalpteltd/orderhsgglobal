@@ -292,7 +292,6 @@ export default function App() {
     if (currentSubmitType === "order") {
       const totalOrderCartons = cart.filter((item) => item.mode === "order").reduce((a, b) => a + b.quantity, 0);
       if (totalOrderCartons < 4) {
-        showToast("Minimum Order is 4 cartons per delivery!", "warning");
         return;
       }
     }
@@ -1036,29 +1035,62 @@ export default function App() {
             )}
           </div>
 
-          {cart.filter((item) => item.mode === "order").length > 0 && (
-            <div className="cart-drawer-footer">
-              <div className="flex justify-between font-bold text-sm text-zinc-700">
-                <span>Total Cartons:</span>
-                <span>{cart.filter((item) => item.mode === "order").reduce((a, b) => a + b.quantity, 0)} Ctn</span>
+          {cart.filter((item) => item.mode === "order").length > 0 && (() => {
+            const totalOrderCartons = cart.filter((item) => item.mode === "order").reduce((a, b) => a + b.quantity, 0);
+            const isUnderMin = totalOrderCartons < 4;
+            return (
+              <div className="cart-drawer-footer" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div className="flex justify-between font-bold text-sm text-zinc-700">
+                  <span>Total Cartons:</span>
+                  <span style={isUnderMin ? { color: "#d32f2f" } : undefined}>
+                    {totalOrderCartons} Ctn {isUnderMin && <span style={{ fontSize: "10px", fontWeight: "normal", color: "#d32f2f" }}>(Min: 4)</span>}
+                  </span>
+                </div>
+                
+                {isUnderMin && (
+                  <div style={{
+                    backgroundColor: "#fff5f5",
+                    border: "1px solid #ffe3e3",
+                    color: "#e53e3e",
+                    borderRadius: "8px",
+                    padding: "8px 10px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    lineHeight: "1.3",
+                    boxSizing: "border-box"
+                  }}>
+                    <AlertCircle style={{ width: "14px", height: "14px", flexShrink: 0, color: "#e53e3e" }} />
+                    <span style={{ textAlign: "left" }}>
+                      Minimum order is 4 cartons. Please add at least {4 - totalOrderCartons} more carton(s) to check out.
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    if (isUnderMin) return;
+                    setIsCartOpen(false);
+                    setSubmitType("order");
+                    setShowCheckoutModal(true);
+                  }}
+                  disabled={isUnderMin}
+                  className="btn-checkout"
+                  style={isUnderMin ? {
+                    opacity: 0.5,
+                    cursor: "not-allowed",
+                    backgroundColor: "#a1a1aa",
+                    borderColor: "#a1a1aa",
+                    boxShadow: "none"
+                  } : undefined}
+                >
+                  Proceed Order
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  const totalOrderCartons = cart.filter((item) => item.mode === "order").reduce((a, b) => a + b.quantity, 0);
-                  if (totalOrderCartons < 4) {
-                    showToast("Minimum Order is 4 cartons per delivery!", "warning");
-                    return;
-                  }
-                  setIsCartOpen(false);
-                  setSubmitType("order");
-                  setShowCheckoutModal(true);
-                }}
-                className="btn-checkout"
-              >
-                Proceed Order
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
