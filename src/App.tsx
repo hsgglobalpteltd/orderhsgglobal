@@ -1346,11 +1346,15 @@ function ThankYouPage({
     return /Mobi|Android|iPhone/i.test(navigator.userAgent) || (window.innerWidth < 768);
   }, []);
 
+  const hasWhatsApp = React.useMemo(() => {
+    return !!(data.receiver_order_whatsapp && data.receiver_order_whatsapp.trim() && data.receiver_order_whatsapp.trim() !== "0");
+  }, [data.receiver_order_whatsapp]);
+
   const [countdown, setCountdown] = React.useState(10);
   const whatsappTarget = `https://wa.me/${data.receiver_order_whatsapp.replace("+", "")}?text=${encodeURIComponent(data.summaryText)}`;
 
   React.useEffect(() => {
-    if (!isMobile) return;
+    if (!isMobile || !hasWhatsApp) return;
     
     const interval = setInterval(() => {
       setCountdown((prev) => {
@@ -1364,7 +1368,7 @@ function ThankYouPage({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMobile, whatsappTarget]);
+  }, [isMobile, hasWhatsApp, whatsappTarget]);
 
   const handleSendNow = () => {
     window.location.href = whatsappTarget;
@@ -1421,7 +1425,7 @@ function ThankYouPage({
             margin: 0,
             lineHeight: "1.25"
           }}>
-            {data.type === "order" ? "Thank You for Your Order!" : "Thank You for Your Quotation Request!"}
+            {data.type === "order" ? "We've received your order!" : "We've received your request!"}
           </h2>
           <p style={{
             color: "#71717a",
@@ -1430,8 +1434,8 @@ function ThankYouPage({
             margin: 0
           }}>
             {data.type === "order" 
-              ? "Your purchase order has been successfully generated in our system."
-              : "Your quotation request details have been successfully prepared."}
+              ? "We've received your order details and are already starting to prepare everything for you. Our team will keep you updated along the way."
+              : "Our sales team is currently reviewing your details. We will prepare your customized catalog and get back to you very soon."}
           </p>
         </div>
 
@@ -1444,59 +1448,63 @@ function ThankYouPage({
           padding: "16px",
           display: "flex",
           flexDirection: "column",
-          gap: "12px",
-          textAlign: "left",
+          gap: "4px",
+          textAlign: "center",
           boxSizing: "border-box"
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "#71717a", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reference ID</span>
-            <span style={{ color: "#18181b", fontFamily: "monospace", fontWeight: "700", backgroundColor: "#e4e4e7", padding: "2px 8px", borderRadius: "4px", fontSize: "12px" }}>{data.id}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e4e4e7", paddingTop: "12px" }}>
-            <span style={{ color: "#71717a", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
-            <span style={{ color: "#18181b", fontWeight: "700", textTransform: "uppercase", fontSize: "11px" }}>{data.type === "order" ? "Purchase Order" : "Quotation Request"}</span>
-          </div>
+          <span style={{ color: "#71717a", fontSize: "12px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {data.type === "order" ? "Order Number" : "Request Number"}
+          </span>
+          <span style={{ color: "#18181b", fontWeight: "800", fontSize: "18px", letterSpacing: "0.5px" }}>
+            {data.id}
+          </span>
         </div>
 
         {/* WhatsApp redirection actions */}
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center", boxSizing: "border-box" }}>
-          <button
-            onClick={handleSendNow}
-            style={{
-              width: "100%",
-              padding: "14px 20px",
-              backgroundColor: "#25D366",
-              color: "#ffffff",
-              fontSize: "15px",
-              fontWeight: "750",
-              border: "none",
-              borderRadius: "12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              boxShadow: "0 4px 6px -1px rgba(37, 211, 102, 0.2)",
-              cursor: "pointer",
-              transition: "background-color 0.2s",
-              boxSizing: "border-box"
-            }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#20ba59"}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = "#25D366"}
-          >
-            <MessageSquare style={{ width: "18px", height: "18px", fill: "currentColor" }} />
-            {isMobile ? "Send to WhatsApp" : "Send via WhatsApp"}
-          </button>
-          
-          {isMobile ? (
-            <p style={{ color: "#71717a", fontSize: "12px", fontWeight: "600", margin: 0 }}>
-              Redirecting to WhatsApp in <span style={{ color: "#ff6f00", fontWeight: "700" }}>{countdown}</span> seconds...
-            </p>
-          ) : (
-            <p style={{ color: "#71717a", fontSize: "12px", lineHeight: "1.4", margin: 0, maxWidth: "320px", textAlign: "center" }}>
-              Please click the button above to send your document summary directly to our sales agent on WhatsApp Web.
-            </p>
-          )}
-        </div>
+        {hasWhatsApp ? (
+          <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center", boxSizing: "border-box" }}>
+            <button
+              onClick={handleSendNow}
+              style={{
+                width: "100%",
+                padding: "14px 20px",
+                backgroundColor: "#25D366",
+                color: "#ffffff",
+                fontSize: "15px",
+                fontWeight: "750",
+                border: "none",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                boxShadow: "0 4px 6px -1px rgba(37, 211, 102, 0.2)",
+                cursor: "pointer",
+                transition: "background-color 0.2s",
+                boxSizing: "border-box"
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#20ba59"}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = "#25D366"}
+            >
+              <MessageSquare style={{ width: "18px", height: "18px", fill: "currentColor" }} />
+              {isMobile ? "Send to WhatsApp" : "Send via WhatsApp"}
+            </button>
+            
+            {isMobile ? (
+              <p style={{ color: "#71717a", fontSize: "12px", fontWeight: "600", margin: 0 }}>
+                Redirecting to WhatsApp in <span style={{ color: "#ff6f00", fontWeight: "700" }}>{countdown}</span> seconds...
+              </p>
+            ) : (
+              <p style={{ color: "#71717a", fontSize: "12px", lineHeight: "1.4", margin: 0, maxWidth: "320px", textAlign: "center" }}>
+                Please click the button above to send your summary details directly to our sales team on WhatsApp.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p style={{ color: "#71717a", fontSize: "13px", lineHeight: "1.5", margin: 0, maxWidth: "340px", textAlign: "center", fontStyle: "italic" }}>
+            Our team will contact you directly via your registered email address or phone number. Have a wonderful day!
+          </p>
+        )}
 
         {/* Catalog Dismiss Button */}
         <button
