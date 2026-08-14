@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Printer, AlertCircle, Trash2, ClipboardList } from "lucide-react";
+import { Search, ShoppingCart, X, Plus, Minus, Printer, AlertCircle, Trash2, ClipboardList, CheckCircle2, MessageSquare } from "lucide-react";
 
 interface ProductMeta {
   Title: string;
@@ -40,6 +40,7 @@ export default function App() {
   // Navigation & View states
   const [orderIdParam, setOrderIdParam] = React.useState<string | null>(null);
   const [quoteIdParam, setQuoteIdParam] = React.useState<string | null>(null);
+  const [thankYouData, setThankYouData] = React.useState<{ id: string; type: string; receiver_order_whatsapp: string; summaryText: string } | null>(null);
   
   // Data states
   const [products, setProducts] = React.useState<Product[]>(() => {
@@ -359,7 +360,7 @@ export default function App() {
 
         // Generate WhatsApp redirection URL containing order summary and tracking link
         const currentDomain = window.location.origin;
-        const isOrder = result.id.startsWith("DO-");
+        const isOrder = result.id.startsWith("DO-") || result.id.startsWith("PO-");
         const trackingLink = isOrder
           ? `${currentDomain}/?orderId=${result.id}`
           : `${currentDomain}/?quoteId=${result.id}`;
@@ -386,11 +387,12 @@ export default function App() {
           summaryText += `${trackingLink}`;
         }
 
-        const encodedMsg = encodeURIComponent(summaryText);
-        const whatsappTarget = `https://wa.me/${result.receiver_order_whatsapp.replace("+", "")}?text=${encodedMsg}`;
-        
-        // Open WhatsApp redirection link
-        window.location.href = whatsappTarget;
+        setThankYouData({
+          id: result.id,
+          type: isOrder ? "order" : "quote",
+          receiver_order_whatsapp: result.receiver_order_whatsapp,
+          summaryText
+        });
       }
     } catch (err) {
       showToast("Checkout failed. Please try again.", "error");
@@ -622,6 +624,16 @@ export default function App() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // RENDER: Thank You View Page
+  if (thankYouData) {
+    return (
+      <ThankYouPage 
+        data={thankYouData} 
+        onClose={() => setThankYouData(null)} 
+      />
     );
   }
 
@@ -1319,6 +1331,193 @@ export default function App() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+function ThankYouPage({
+  data,
+  onClose
+}: {
+  data: { id: string; type: string; receiver_order_whatsapp: string; summaryText: string };
+  onClose: () => void;
+}) {
+  const isMobile = React.useMemo(() => {
+    return /Mobi|Android|iPhone/i.test(navigator.userAgent) || (window.innerWidth < 768);
+  }, []);
+
+  const [countdown, setCountdown] = React.useState(10);
+  const whatsappTarget = `https://wa.me/${data.receiver_order_whatsapp.replace("+", "")}?text=${encodeURIComponent(data.summaryText)}`;
+
+  React.useEffect(() => {
+    if (!isMobile) return;
+    
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          window.location.href = whatsappTarget;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isMobile, whatsappTarget]);
+
+  const handleSendNow = () => {
+    window.location.href = whatsappTarget;
+  };
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh",
+      backgroundColor: "#f4f4f5",
+      padding: "16px",
+      boxSizing: "border-box",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    }}>
+      <div style={{
+        backgroundColor: "#ffffff",
+        padding: "32px",
+        border: "1px solid #e4e4e7",
+        borderRadius: "20px",
+        textAlign: "center",
+        maxWidth: "450px",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "24px",
+        boxSizing: "border-box",
+        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)"
+      }}>
+        {/* Success Icon */}
+        <div style={{
+          width: "64px",
+          height: "64px",
+          backgroundColor: "#ffebd8",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#ff6f00",
+          boxShadow: "inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)"
+        }}>
+          <CheckCircle2 style={{ width: "36px", height: "36px" }} />
+        </div>
+        
+        {/* Header text */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <h2 style={{
+            fontSize: "22px",
+            fontWeight: "900",
+            color: "#18181b",
+            letterSpacing: "-0.5px",
+            margin: 0,
+            lineHeight: "1.25"
+          }}>
+            {data.type === "order" ? "Thank You for Your Order!" : "Thank You for Your Quotation Request!"}
+          </h2>
+          <p style={{
+            color: "#71717a",
+            fontSize: "14px",
+            lineHeight: "1.5",
+            margin: 0
+          }}>
+            {data.type === "order" 
+              ? "Your purchase order has been successfully generated in our system."
+              : "Your quotation request details have been successfully prepared."}
+          </p>
+        </div>
+
+        {/* Transaction details card */}
+        <div style={{
+          width: "100%",
+          backgroundColor: "#f4f4f5",
+          border: "1px solid #e4e4e7",
+          borderRadius: "12px",
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          textAlign: "left",
+          boxSizing: "border-box"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "#71717a", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reference ID</span>
+            <span style={{ color: "#18181b", fontFamily: "monospace", fontWeight: "700", backgroundColor: "#e4e4e7", padding: "2px 8px", borderRadius: "4px", fontSize: "12px" }}>{data.id}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e4e4e7", paddingTop: "12px" }}>
+            <span style={{ color: "#71717a", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
+            <span style={{ color: "#18181b", fontWeight: "700", textTransform: "uppercase", fontSize: "11px" }}>{data.type === "order" ? "Purchase Order" : "Quotation Request"}</span>
+          </div>
+        </div>
+
+        {/* WhatsApp redirection actions */}
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center", boxSizing: "border-box" }}>
+          <button
+            onClick={handleSendNow}
+            style={{
+              width: "100%",
+              padding: "14px 20px",
+              backgroundColor: "#25D366",
+              color: "#ffffff",
+              fontSize: "15px",
+              fontWeight: "750",
+              border: "none",
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: "0 4px 6px -1px rgba(37, 211, 102, 0.2)",
+              cursor: "pointer",
+              transition: "background-color 0.2s",
+              boxSizing: "border-box"
+            }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#20ba59"}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = "#25D366"}
+          >
+            <MessageSquare style={{ width: "18px", height: "18px", fill: "currentColor" }} />
+            {isMobile ? "Send to WhatsApp" : "Send via WhatsApp"}
+          </button>
+          
+          {isMobile ? (
+            <p style={{ color: "#71717a", fontSize: "12px", fontWeight: "600", margin: 0 }}>
+              Redirecting to WhatsApp in <span style={{ color: "#ff6f00", fontWeight: "700" }}>{countdown}</span> seconds...
+            </p>
+          ) : (
+            <p style={{ color: "#71717a", fontSize: "12px", lineHeight: "1.4", margin: 0, maxWidth: "320px", textAlign: "center" }}>
+              Please click the button above to send your document summary directly to our sales agent on WhatsApp Web.
+            </p>
+          )}
+        </div>
+
+        {/* Catalog Dismiss Button */}
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#71717a",
+            fontSize: "13px",
+            fontWeight: "700",
+            cursor: "pointer",
+            marginTop: "4px",
+            textDecoration: "underline",
+            outline: "none"
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = "#18181b"}
+          onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}
+        >
+          Back to Catalog
+        </button>
+      </div>
     </div>
   );
 }
