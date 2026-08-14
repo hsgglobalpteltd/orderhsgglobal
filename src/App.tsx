@@ -114,8 +114,31 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const oId = params.get("orderId");
     const qId = params.get("quoteId");
+    const rId = params.get("retailerId");
     if (oId) setOrderIdParam(oId);
     if (qId) setQuoteIdParam(qId);
+    if (rId) {
+      const autoVerify = async () => {
+        setVerifying(true);
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/public/retailer?id=${encodeURIComponent(rId.trim())}`);
+          if (!res.ok) throw new Error("Network response error");
+          const data = await res.json();
+          if (data.found) {
+            setVerifiedRetailer(data.retailer);
+            setRetailerStores(data.stores || []);
+            setRetailerSkus(data.skus || []);
+            setSelectedStoreId("");
+            setRetailerInput(rId.trim());
+          }
+        } catch (err) {
+          console.error("Auto verification failed:", err);
+        } finally {
+          setVerifying(false);
+        }
+      };
+      autoVerify();
+    }
   }, []);
 
   // Fetch Catalog data
@@ -534,7 +557,7 @@ export default function App() {
           <div className="tracking-body">
             <div className={`tracking-status-bar ${isCompleted ? "completed" : ""}`}>
               <span>STATUS:</span>
-              <span className="text-sm uppercase">{rec.status || "PENDING"}</span>
+              <span className="text-sm uppercase">{(rec.status || "PENDING").toUpperCase()}</span>
             </div>
 
             <div className="tracking-info-grid">
