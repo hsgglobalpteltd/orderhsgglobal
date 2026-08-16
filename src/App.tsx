@@ -141,6 +141,18 @@ export default function App() {
     }
   }, []);
 
+  // Sync contact details when verifiedRetailer changes
+  React.useEffect(() => {
+    if (verifiedRetailer) {
+      setCustName(verifiedRetailer.display_name || "");
+      setCustEmail(verifiedRetailer.email || "");
+    } else {
+      setCustName("");
+      setCustEmail("");
+      setCustPhone("");
+    }
+  }, [verifiedRetailer]);
+
   // Fetch Catalog data
   const fetchCatalog = React.useCallback(async () => {
     let hasCached = false;
@@ -229,7 +241,7 @@ export default function App() {
         setRetailerSkus([]);
         showToast("Invalid Retailer ID. Please try again.", "error");
       }
-    } catch (err) {
+    } catch {
       showToast("Verification failed. Please try again.", "error");
     } finally {
       setVerifying(false);
@@ -247,7 +259,7 @@ export default function App() {
   };
 
   // Add product to cart helper
-  const handleAddToCart = (product: Product, qty: number, mode: "order" | "quote" = "order") => {
+  const handleAddToCart = (product: Product, qty: number, mode: "order" | "quote" = "order", e?: React.MouseEvent) => {
     const parsedQty = Number(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) return;
 
@@ -260,6 +272,9 @@ export default function App() {
       }
       return [...prev, { product, quantity: parsedQty, mode }];
     });
+    if (e) {
+      animateFlyToCart(e, mode);
+    }
     showToast(`Added ${parsedQty} carton(s) to ${mode === "order" ? "cart" : "quote"}`, "success");
   };
 
@@ -332,29 +347,54 @@ export default function App() {
       if (verifiedRetailer) {
         payload.retailer_id = verifiedRetailer.id;
         
-        let retailerNameDisplay = verifiedRetailer.name || verifiedRetailer.display_name || "Retailer";
-        if (selectedStoreId) {
+        let retailerNameDisplay = verifiedRetailer.display_name || "Retailer";
+        if (selectedStoreId && currentSubmitType === "order") {
           // Append Store ID in parentheses next to name
           retailerNameDisplay = `${retailerNameDisplay} (${selectedStoreId})`;
         }
         payload.retailer_name = retailerNameDisplay;
         
-        // Find store details
-        const selectedStore = retailerStores.find((s) => s.id === selectedStoreId);
-        if (selectedStore) {
-          payload.store_id = selectedStore.id;
-          payload.address = selectedStore.address;
-          payload.postcode = selectedStore.postcode || "";
-          payload.pin_location = selectedStore.pin_locations || "";
-        } else {
+        if (currentSubmitType === "quote") {
+          if (!custPhone.trim() || !custEmail.trim()) {
+            showToast("Please fill in contact phone and email", "warning");
+            setSubmitting(false);
+            return;
+          }
+          payload.customer_name = custName.trim() || verifiedRetailer.display_name;
+          payload.customer_phone = custPhone.trim();
+          payload.customer_email = custEmail.trim();
+
           payload.store_id = null;
           payload.address = verifiedRetailer.address || "";
           payload.postcode = verifiedRetailer.postcode || "";
           payload.pin_location = verifiedRetailer.pin_location || "";
+        } else {
+          // For orders: email is mandatory
+          if (!custEmail.trim()) {
+            showToast("Please fill in your email address", "warning");
+            setSubmitting(false);
+            return;
+          }
+          payload.customer_email = custEmail.trim();
+          payload.customer_name = verifiedRetailer.display_name || "";
+
+          // Find store details
+          const selectedStore = retailerStores.find((s) => s.id === selectedStoreId);
+          if (selectedStore) {
+            payload.store_id = selectedStore.id;
+            payload.address = selectedStore.address;
+            payload.postcode = selectedStore.postcode || "";
+            payload.pin_location = selectedStore.pin_locations || "";
+          } else {
+            payload.store_id = null;
+            payload.address = verifiedRetailer.address || "";
+            payload.postcode = verifiedRetailer.postcode || "";
+            payload.pin_location = verifiedRetailer.pin_location || "";
+          }
         }
       } else {
-        if (!custName.trim() || !custPhone.trim() || !custEmail.trim() || !custAddress.trim() || !custPostcode.trim()) {
-          showToast("Please fill in all contact details", "warning");
+        if (!custName.trim() || !custPhone.trim() || !custEmail.trim()) {
+          showToast("Please fill in name, phone, and email", "warning");
           setSubmitting(false);
           return;
         }
@@ -376,6 +416,10 @@ export default function App() {
       
       if (result.success && result.id) {
         showToast("Checkout successful!", "success");
+        // Update local state email
+        if (verifiedRetailer && custEmail.trim()) {
+          setVerifiedRetailer((prev: any) => (prev ? { ...prev, email: custEmail.trim() } : null));
+        }
         setCart([]);
         setIsCartOpen(false);
         setShowCheckoutModal(false);
@@ -416,7 +460,7 @@ export default function App() {
           summaryText
         });
       }
-    } catch (err) {
+    } catch {
       showToast("Checkout failed. Please try again.", "error");
     } finally {
       setSubmitting(false);
@@ -428,6 +472,65 @@ export default function App() {
   const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Fly-to-cart orange dot animation helper
+  const animateFlyToCart = (e: React.MouseEvent, mode: "order" | "quote") => {
+    const btn = e.currentTarget as HTMLElement;
+    if (!btn) return;
+
+    const targetId = mode === "order" ? "cart-btn-header" : "quote-btn-header";
+    const targetBtn = document.getElementById(targetId);
+    if (!targetBtn) return;
+
+    const btnRect = btn.getBoundingClientRect();
+    const targetRect = targetBtn.getBoundingClientRect();
+    const btnStyles = window.getComputedStyle(btn);
+
+    // Create a solid orange block matching the button's dimensions and shape (no text inside)
+    const clone = document.createElement("div");
+    clone.className = "flying-cart-button";
+    
+    // Lock dimensions, shape, background color, and set starting coordinates
+    clone.style.position = "fixed";
+    clone.style.left = `${btnRect.left}px`;
+    clone.style.top = `${btnRect.top}px`;
+    clone.style.width = `${btnRect.width}px`;
+    clone.style.height = `${btnRect.height}px`;
+    clone.style.borderRadius = btnStyles.borderRadius || "4px";
+    clone.style.backgroundColor = "#ee4d2d"; // Solid primary orange color
+    clone.style.zIndex = "99999";
+    clone.style.pointerEvents = "none";
+    clone.style.transition = "transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s ease";
+    clone.style.transformOrigin = "center";
+    
+    document.body.appendChild(clone);
+
+    // Target coordinates (center of the cart/quote button in header)
+    const endX = targetRect.left + targetRect.width / 2;
+    const endY = targetRect.top + targetRect.height / 2;
+    
+    // Calculate the translation offsets relative to clone's center
+    const startCenterX = btnRect.left + btnRect.width / 2;
+    const startCenterY = btnRect.top + btnRect.height / 2;
+
+    const transX = endX - startCenterX;
+    const transY = endY - startCenterY;
+
+    // Force reflow
+    void clone.offsetHeight;
+
+    // Translate and scale down the solid orange block
+    clone.style.transform = `translate(${transX}px, ${transY}px) scale(0.1)`;
+    clone.style.opacity = "0";
+
+    setTimeout(() => {
+      clone.remove();
+      targetBtn.classList.add("cart-bounce");
+      setTimeout(() => {
+        targetBtn.classList.remove("cart-bounce");
+      }, 300);
+    }, 600);
   };
 
 
@@ -726,7 +829,7 @@ export default function App() {
             )}
 
             {verifiedRetailer && (
-              <button onClick={() => { setIsCartOpen(true); setIsQuoteOpen(false); }} className="cart-icon-btn" title="Order List">
+              <button id="cart-btn-header" onClick={() => { setIsCartOpen(true); setIsQuoteOpen(false); }} className="cart-icon-btn" title="Order List">
                 <ShoppingCart className="w-5 h-5" />
                 {cart.filter(item => item.mode === "order").length > 0 && (
                   <span className="cart-badge">
@@ -736,7 +839,7 @@ export default function App() {
               </button>
             )}
 
-            <button onClick={() => { setIsQuoteOpen(true); setIsCartOpen(false); }} className={`cart-icon-btn ${verifiedRetailer ? "ml-2" : ""}`} title="Quote List">
+            <button id="quote-btn-header" onClick={() => { setIsQuoteOpen(true); setIsCartOpen(false); }} className={`cart-icon-btn ${verifiedRetailer ? "ml-2" : ""}`} title="Quote List">
               <ClipboardList className="w-5 h-5" />
               {cart.filter(item => item.mode === "quote").length > 0 && (
                 <span className="cart-badge">
@@ -847,7 +950,7 @@ export default function App() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleAddToCart(p, 1, "quote");
+                                handleAddToCart(p, 1, "quote", e);
                               }}
                               className="btn-card-quote"
                               style={!verifiedRetailer ? { backgroundColor: "var(--primary)", color: "var(--white)", borderColor: "var(--primary)" } : undefined}
@@ -859,7 +962,7 @@ export default function App() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleAddToCart(p, 1, "order");
+                                  handleAddToCart(p, 1, "order", e);
                                 }}
                                 className="btn-card-add"
                               >
@@ -877,19 +980,21 @@ export default function App() {
           </div>
         )}
 
-        {/* Terms and Conditions Footer */}
-        <footer className="tc-footer">
-          <div className="tc-sticky-note">
-            <h4>Terms & Conditions</h4>
-            <ul>
-              <li><strong>Delivery Timeline:</strong> Standard delivery completed within a maximum of 4 working days.</li>
-              <li><strong>Urgent Requests:</strong> Urgent delivery requirements must be negotiated directly prior to submission.</li>
-              <li><strong>Minimum Quantity:</strong> Orders are subject to a strict minimum of 4 cartons per delivery.</li>
-              <li><strong>Pricing:</strong> Item prices are based on established B2B commercial agreements.</li>
-              <li><strong>Payment Terms:</strong> Settlements must comply with established B2B contractual agreements.</li>
-            </ul>
-          </div>
-        </footer>
+        {/* Terms and Conditions Footer - Shown only to verified visitors */}
+        {verifiedRetailer && (
+          <footer className="tc-footer">
+            <div className="tc-sticky-note">
+              <h4>Terms & Conditions</h4>
+              <ul>
+                <li><strong>Delivery Timeline:</strong> Standard delivery completed within a maximum of 4 working days.</li>
+                <li><strong>Urgent Requests:</strong> Urgent delivery requirements must be negotiated directly prior to submission.</li>
+                <li><strong>Minimum Quantity:</strong> Orders are subject to a strict minimum of 4 cartons per delivery.</li>
+                <li><strong>Pricing:</strong> Item prices are based on established B2B commercial agreements.</li>
+                <li><strong>Payment Terms:</strong> Settlements must comply with established B2B contractual agreements.</li>
+              </ul>
+            </div>
+          </footer>
+        )}
 
       </div>
 
@@ -965,8 +1070,8 @@ export default function App() {
                   <div className="flex gap-2">
                     {verifiedRetailer && (
                       <button
-                        onClick={() => {
-                          handleAddToCart(selectedProduct, detailQty, "order");
+                        onClick={(e) => {
+                          handleAddToCart(selectedProduct, detailQty, "order", e);
                           setSelectedProduct(null);
                         }}
                         className="btn-primary flex-grow"
@@ -975,8 +1080,8 @@ export default function App() {
                       </button>
                     )}
                     <button
-                      onClick={() => {
-                        handleAddToCart(selectedProduct, detailQty, "quote");
+                      onClick={(e) => {
+                        handleAddToCart(selectedProduct, detailQty, "quote", e);
                         setSelectedProduct(null);
                       }}
                       className="btn-secondary flex-grow"
@@ -1219,12 +1324,12 @@ export default function App() {
 
             <div className="flex flex-col gap-1 border-b border-zinc-200 pb-3 mb-4">
               <h3 className="text-lg font-bold text-zinc-800">
-                {submitType === "order" ? "Checkout Confirmation" : "Quotation Confirmation"}
+                {submitType === "order" ? "Order Confirmation" : "Quotation Confirmation"}
               </h3>
               <p className="text-xs text-zinc-500">
                 {submitType === "order" 
-                  ? "Place your carton order list. No money will be collected." 
-                  : "Submit your request list to receive a price quotation."}
+                  ? "Please review your delivery address and contact email below to ensure everything is correct. No payment is required to place your order." 
+                  : "Please verify your name, email, and phone number below. We will prepare and send your custom price quotation shortly."}
               </p>
             </div>
 
@@ -1232,33 +1337,84 @@ export default function App() {
               // BUYER CHECKOUT FORM
               <div className="flex flex-col gap-3">
                 <div className="bg-orange-50 border border-orange-200 rounded p-3 text-xs text-orange-800">
-                  <strong>Verified Buyer:</strong> {verifiedRetailer.name} ({verifiedRetailer.id})
+                  <strong>Verified Buyer:</strong> {verifiedRetailer.display_name || verifiedRetailer.name}
                 </div>
 
-                {verifiedRetailer.has_multiple_stores === "true" || verifiedRetailer.has_multiple_stores === true || retailerStores.length > 0 ? (
-                  <div className="form-group">
-                    <label>Select Delivery Outlet Location:</label>
-                    <select
-                      value={selectedStoreId}
-                      onChange={(e) => setSelectedStoreId(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Choose Outlet Location --</option>
-                      {retailerStores.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.display_name} - {s.address} ({s.id})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="form-group">
-                    <label>Delivery Address:</label>
-                    <div className="text-xs text-zinc-700 bg-zinc-50 p-2.5 border border-zinc-200 rounded">
-                      <div>{verifiedRetailer.address || "Main Office"}</div>
-                      <div>Postcode: {verifiedRetailer.postcode || "-"}</div>
+                {submitType === "order" ? (
+                  // For Orders, we show delivery locations
+                  <>
+                    {verifiedRetailer.has_multiple_stores === "true" || verifiedRetailer.has_multiple_stores === true || retailerStores.length > 0 ? (
+                      <div className="form-group">
+                        <label>Select Delivery Outlet Location:</label>
+                        <select
+                          value={selectedStoreId}
+                          onChange={(e) => setSelectedStoreId(e.target.value)}
+                          required
+                        >
+                          <option value="">-- Choose Outlet Location --</option>
+                          {retailerStores.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.display_name} - {s.address} ({s.id})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="form-group">
+                        <label>Delivery Address:</label>
+                        <div className="text-xs text-zinc-700 bg-zinc-50 p-2.5 border border-zinc-200 rounded">
+                          <div>{verifiedRetailer.address || "Main Office"}</div>
+                          <div>Postcode: {verifiedRetailer.postcode || "-"}</div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Add Email input for order confirmation */}
+                    <div className="form-group">
+                      <label>Email Address:</label>
+                      <input
+                        type="email"
+                        required
+                        value={custEmail}
+                        onChange={(e) => setCustEmail(e.target.value)}
+                        placeholder="e.g. john@company.com"
+                      />
                     </div>
-                  </div>
+                  </>
+                ) : (
+                  // For Quotes, we show Contact Person, Email and Phone Number input fields, because quote is not delivery!
+                  <>
+                    <div className="form-group">
+                      <label>Contact Person Name:</label>
+                      <input
+                        type="text"
+                        required
+                        value={custName}
+                        onChange={(e) => setCustName(e.target.value)}
+                        placeholder="e.g. Masjid Al-Istighfar"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Contact Phone Number:</label>
+                      <input
+                        type="tel"
+                        required
+                        value={custPhone}
+                        onChange={(e) => setCustPhone(e.target.value)}
+                        placeholder="e.g. +6587654321"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Email Address:</label>
+                      <input
+                        type="email"
+                        required
+                        value={custEmail}
+                        onChange={(e) => setCustEmail(e.target.value)}
+                        placeholder="e.g. john@company.com"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             ) : (
@@ -1305,10 +1461,9 @@ export default function App() {
                   <label>Delivery/Billing Address:</label>
                   <input
                     type="text"
-                    required
                     value={custAddress}
                     onChange={(e) => setCustAddress(e.target.value)}
-                    placeholder="e.g. Blk 123 Toa Payoh Lorong 1"
+                    placeholder="e.g. Blk 123 Toa Payoh Lorong 1 (Optional)"
                   />
                 </div>
 
@@ -1316,10 +1471,9 @@ export default function App() {
                   <label>Postal Code:</label>
                   <input
                     type="text"
-                    required
                     value={custPostcode}
                     onChange={(e) => setCustPostcode(e.target.value)}
-                    placeholder="e.g. 310123"
+                    placeholder="e.g. 310123 (Optional)"
                   />
                 </div>
               </div>
@@ -1382,7 +1536,7 @@ export default function App() {
         <div 
           style={{
             position: "fixed",
-            bottom: "24px",
+            top: "80px",
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 9999,

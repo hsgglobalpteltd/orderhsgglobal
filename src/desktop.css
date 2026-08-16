@@ -24,12 +24,17 @@
   display: none !important; /* Chrome, Safari and Opera */
 }
 
+html {
+  background-color: var(--primary); /* Force status bar theme color on iOS Safari */
+}
+
 body {
   background-color: var(--bg-light);
   color: var(--text-dark);
   line-height: 1.4;
   overflow-x: hidden;
   max-width: 100%;
+  min-height: 100vh;
 }
 
 /* Sticky top bar */
@@ -257,6 +262,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-bottom: 48px; /* XXL spacing below last product */
 }
 
 .brand-group-header {
@@ -1055,10 +1061,10 @@ header {
 
 .sticky-tabs-container {
   position: sticky;
-  top: 56px;
+  top: 50px;
   z-index: 50;
   background-color: var(--bg-light);
-  padding: 8px 0;
+  padding: 16px 0;
   margin-top: -8px;
   margin-bottom: 12px;
 }
@@ -1125,6 +1131,28 @@ header {
   position: absolute;
   left: 0;
   top: 0;
+}
+
+/* Flying cart button styles */
+.flying-cart-button {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Cart / Quote icon bounce micro-interaction */
+.cart-bounce {
+  animation: cart-bounce-keyframes 0.3s ease-out;
+}
+
+@keyframes cart-bounce-keyframes {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 
