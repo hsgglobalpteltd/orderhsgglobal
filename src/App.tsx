@@ -1,5 +1,17 @@
 import * as React from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Printer, AlertCircle, Trash2, ClipboardList, CheckCircle2, MessageSquare } from "lucide-react";
+import { 
+  Search, 
+  ShoppingCart, 
+  X, 
+  Plus, 
+  Minus, 
+  Printer, 
+  AlertCircle, 
+  Trash2, 
+  ClipboardList, 
+  CheckCircle2, 
+  MessageSquare
+} from "lucide-react";
 
 interface ProductMeta {
   Title: string;
@@ -18,6 +30,15 @@ interface Product {
   carton: string;
   cost: string;
   status: string;
+  single_barcode?: string;
+  carton_barcode?: string;
+  carton_weight?: string;
+  carton_l_mm?: string | number | null;
+  carton_w_mm?: string | number | null;
+  carton_h_mm?: string | number | null;
+  pallet_ctn?: string | number | null;
+  storage_condition?: string | null;
+  shelf_life?: string | null;
   product_meta: string | ProductMeta;
   list_in_catalog: boolean;
 }
@@ -32,6 +53,66 @@ interface CartItem {
   product: Product;
   quantity: number; // in Cartons
   mode: "order" | "quote";
+}
+
+export interface B2BSpecs {
+  eaUnit: string;
+  eaBarcode: string;
+  ctnQty: number;
+  ctnPacking: string;
+  ctnBarcode: string;
+  pltConfig: string;
+  pltTotalCtn: number;
+  palletDisplay: string;
+  storageTier: string;
+  shelfLife: string;
+  localMoq: string;
+  exportMoq: string;
+  certifications: string[];
+}
+
+export function getProductB2BSpecs(product: Product, meta: ProductMeta): B2BSpecs {
+  const name = `${product.display_name} ${meta.Title || ""}`;
+  
+  // 1. Extract Unit Size (EA)
+  let eaUnit = "-";
+  const sizeMatch = name.match(/(\d+(?:\.\d+)?\s*(?:KG|G|GM|L|LTR|ML))/i);
+  if (sizeMatch) {
+    eaUnit = sizeMatch[1].toUpperCase();
+  }
+
+  // 2. Carton Packing (CTN) - From DB `carton`
+  const rawCarton = String(product.carton || "").trim();
+  const ctnPacking = rawCarton ? `${rawCarton} EA / CTN` : "-";
+  const ctnQty = parseInt(rawCarton) || 0;
+
+  // 3. Pallet (PLT) Config - From DB `pallet_ctn` (No simulated fallback)
+  const rawPallet = String(product.pallet_ctn || "").trim();
+  const palletDisplay = rawPallet ? `${rawPallet} CTN` : "-";
+  const pltTotalCtn = parseInt(rawPallet) || 0;
+  const pltConfig = rawPallet ? `${rawPallet} CTN / PLT` : "-";
+
+  // 4. Storage Condition - From DB `storage_condition` (No simulated fallback)
+  const storageTier = product.storage_condition ? String(product.storage_condition).trim() : "-";
+
+  // 5. Shelf Life - From DB `shelf_life` (No simulated fallback)
+  const shelfLife = product.shelf_life ? String(product.shelf_life).trim() : "-";
+
+  return {
+    eaUnit,
+    eaBarcode: product.single_barcode || "-",
+    ctnQty,
+    ctnPacking,
+    ctnBarcode: product.carton_barcode || "-",
+    pltConfig,
+    pltTotalCtn,
+    palletDisplay,
+    storageTier,
+    shelfLife,
+    localMoq: "Min 4 Cartons (Registered SG Store Delivery)",
+    exportMoq: "1 Full Pallet (PLT) / LCL / FCL Container Load",
+    certifications: ["Halal Certified", "HACCP Food Safety", "Distributed by HSG Global"]
+  };
 }
 
 const BACKEND_URL = "https://ib-v2.hsgglobalpteltd.workers.dev";
@@ -74,11 +155,47 @@ export default function App() {
   const [activeCategoryId, setActiveCategoryId] = React.useState<string>("Cooking Paste");
   const [showMobileSearch, setShowMobileSearch] = React.useState(false);
 
-  // Retailer Verification states
-  const [retailerInput, setRetailerInput] = React.useState("");
-  const [verifiedRetailer, setVerifiedRetailer] = React.useState<any | null>(null);
-  const [retailerStores, setRetailerStores] = React.useState<any[]>([]);
-  const [retailerSkus, setRetailerSkus] = React.useState<string[]>([]);
+  // Retailer Verification states with localStorage persistence
+  const [verifiedRetailer, setVerifiedRetailer] = React.useState<any | null>(() => {
+    try {
+      const saved = localStorage.getItem("hsg_verified_retailer_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.retailer || null;
+      }
+    } catch {}
+    return null;
+  });
+  const [retailerStores, setRetailerStores] = React.useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("hsg_verified_retailer_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.stores || [];
+      }
+    } catch {}
+    return [];
+  });
+  const [retailerSkus, setRetailerSkus] = React.useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("hsg_verified_retailer_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.skus || [];
+      }
+    } catch {}
+    return [];
+  });
+  const [retailerInput, setRetailerInput] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem("hsg_verified_retailer_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.retailerInput || "";
+      }
+    } catch {}
+    return "";
+  });
   const [verifying, setVerifying] = React.useState(false);
 
   // Cart states
@@ -130,6 +247,17 @@ export default function App() {
             setRetailerSkus(data.skus || []);
             setSelectedStoreId("");
             setRetailerInput(rId.trim());
+            try {
+              localStorage.setItem(
+                "hsg_verified_retailer_session",
+                JSON.stringify({
+                  retailer: data.retailer,
+                  stores: data.stores || [],
+                  skus: data.skus || [],
+                  retailerInput: rId.trim()
+                })
+              );
+            } catch {}
           }
         } catch (err) {
           console.error("Auto verification failed:", err);
@@ -234,11 +362,25 @@ export default function App() {
         setRetailerStores(data.stores || []);
         setRetailerSkus(data.skus || []);
         setSelectedStoreId("");
+        try {
+          localStorage.setItem(
+            "hsg_verified_retailer_session",
+            JSON.stringify({
+              retailer: data.retailer,
+              stores: data.stores || [],
+              skus: data.skus || [],
+              retailerInput: retailerInput.trim()
+            })
+          );
+        } catch {}
         showToast("Retailer verified successfully!", "success");
       } else {
         setVerifiedRetailer(null);
         setRetailerStores([]);
         setRetailerSkus([]);
+        try {
+          localStorage.removeItem("hsg_verified_retailer_session");
+        } catch {}
         showToast("Invalid Retailer ID. Please try again.", "error");
       }
     } catch {
@@ -256,26 +398,41 @@ export default function App() {
     setSelectedStoreId("");
     setIsCartOpen(false);
     setCart((prev) => prev.filter((item) => item.mode !== "order"));
+    try {
+      localStorage.removeItem("hsg_verified_retailer_session");
+    } catch {}
   };
 
   // Add product to cart helper
-  const handleAddToCart = (product: Product, qty: number, mode: "order" | "quote" = "order", e?: React.MouseEvent) => {
+  const handleAddToCart = (product: Product, qty: number = 1, mode: "order" | "quote" = "order", e?: React.MouseEvent) => {
+    if (mode === "quote") {
+      setCart((prev) => {
+        const existing = prev.find((item) => item.product.sku === product.sku && item.mode === "quote");
+        if (existing) {
+          showToast("Item is already in your Quote list", "info");
+          return prev;
+        }
+        showToast("Added to Price Quote Inquiries", "success");
+        return [...prev, { product, quantity: 1, mode: "quote" }];
+      });
+      if (e) animateFlyToCart(e, "quote");
+      return;
+    }
+
     const parsedQty = Number(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) return;
 
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.sku === product.sku && item.mode === mode);
+      const existing = prev.find((item) => item.product.sku === product.sku && item.mode === "order");
       if (existing) {
         return prev.map((item) =>
-          item.product.sku === product.sku && item.mode === mode ? { ...item, quantity: item.quantity + parsedQty } : item
+          item.product.sku === product.sku && item.mode === "order" ? { ...item, quantity: item.quantity + parsedQty } : item
         );
       }
-      return [...prev, { product, quantity: parsedQty, mode }];
+      return [...prev, { product, quantity: parsedQty, mode: "order" }];
     });
-    if (e) {
-      animateFlyToCart(e, mode);
-    }
-    showToast(`Added ${parsedQty} carton(s) to ${mode === "order" ? "cart" : "quote"}`, "success");
+    if (e) animateFlyToCart(e, "order");
+    showToast(`Added ${parsedQty} carton(s) to order cart`, "success");
   };
 
   const updateCartQty = (sku: string, mode: "order" | "quote", newQty: number) => {
@@ -498,7 +655,7 @@ export default function App() {
     clone.style.width = `${btnRect.width}px`;
     clone.style.height = `${btnRect.height}px`;
     clone.style.borderRadius = btnStyles.borderRadius || "4px";
-    clone.style.backgroundColor = "#ee4d2d"; // Solid primary orange color
+    clone.style.backgroundColor = "#1B4D2E"; // Solid primary forest green color
     clone.style.zIndex = "99999";
     clone.style.pointerEvents = "none";
     clone.style.transition = "transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s ease";
@@ -613,8 +770,8 @@ export default function App() {
       return (
         <div className="flex items-center justify-center min-h-screen bg-zinc-50">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-sm font-semibold text-zinc-500">Loading Order Summary...</p>
+            <div className="w-10 h-10 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm font-semibold text-zinc-600">Loading Order Summary...</p>
           </div>
         </div>
       );
@@ -631,7 +788,7 @@ export default function App() {
               onClick={() => {
                 window.location.href = window.location.origin;
               }}
-              className="mt-2 px-4 py-2 bg-orange-500 text-white rounded font-semibold text-sm hover:bg-orange-600"
+              className="mt-2 px-4 py-2 bg-[#1B4D2E] text-white rounded font-semibold text-sm hover:bg-[#143C23]"
             >
               Go back to Catalog
             </button>
@@ -652,9 +809,12 @@ export default function App() {
     return (
       <div className="min-h-screen bg-zinc-100 py-6 px-4">
         <div className="tracking-wrapper">
-          <div className="tracking-header">
-            <h2 className="text-xl font-bold">HSG Global</h2>
-            <p className="text-xs opacity-90 mt-1">Order Tracking & Receipt</p>
+          <div className="tracking-header" style={{ backgroundColor: "#1B4D2E" }}>
+            <div className="flex items-center justify-center gap-2">
+              <img src="/hsg_logo.png" alt="HSG Global" className="h-5 w-5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <h2 className="text-xl font-bold text-white tracking-wide">HSG GLOBAL</h2>
+            </div>
+            <p className="text-xs text-emerald-100 mt-1">B2B Order Tracking & Commercial Summary</p>
           </div>
 
           <div className="tracking-body">
@@ -666,7 +826,7 @@ export default function App() {
             <div className="tracking-info-grid">
               <div className="tracking-info-item">
                 <span>Reference ID</span>
-                <span>{rec.id}</span>
+                <span className="font-mono font-bold text-zinc-900">{rec.id}</span>
               </div>
               <div className="tracking-info-item">
                 <span>Date Placed</span>
@@ -676,13 +836,13 @@ export default function App() {
               {trackingType === "order" ? (
                 <>
                   <div className="tracking-info-item">
-                <span>Buyer Name</span>
-                <span>{rec.retailer_name}</span>
-              </div>
-              <div className="tracking-info-item">
-                <span>Buyer ID</span>
-                <span>{rec.retailer_id}</span>
-              </div>
+                    <span>Buyer Name</span>
+                    <span className="font-semibold">{rec.retailer_name}</span>
+                  </div>
+                  <div className="tracking-info-item">
+                    <span>Buyer ID</span>
+                    <span className="font-mono">{rec.retailer_id}</span>
+                  </div>
                 </>
               ) : (
                 <>
@@ -717,7 +877,7 @@ export default function App() {
             </div>
 
             <div className="tracking-items-list">
-              <h4 className="text-xs font-bold text-zinc-800 uppercase tracking-wider mb-2">Itemised List</h4>
+              <h4 className="text-xs font-bold text-zinc-800 uppercase tracking-wider mb-2">Itemised Packaging & Order List</h4>
               {parsedItems.map((item, idx) => {
                 // Find local details
                 const prod = products.find((p) => p.sku === item.sku);
@@ -735,14 +895,14 @@ export default function App() {
               onClick={() => window.print()}
               className="btn-print-summary"
             >
-              <Printer className="w-4 h-4" /> Print Document
+              <Printer className="w-4 h-4" /> Print Commercial Slip
             </button>
 
             <button
               onClick={() => {
                 window.location.href = window.location.origin;
               }}
-              className="btn-print-summary bg-zinc-500 hover:bg-zinc-600 mt-2 text-white"
+              className="btn-print-summary bg-zinc-600 hover:bg-zinc-700 mt-2 text-white"
             >
               Return to Catalog
             </button>
@@ -775,15 +935,22 @@ export default function App() {
               setActiveCategoryId("all");
             }}
             className={`brand-title ${showMobileSearch ? "mobile-hidden" : ""}`}
+            title="HSG Global Pte. Ltd."
           >
-            HSG Global
+            <img 
+              src="/hsg_logo.png" 
+              alt="HSG Global Logo" 
+              className="h-[1.25rem] w-[1.25rem] object-contain shrink-0" 
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            <span className="text-emerald-950 font-black tracking-tight leading-none">HSG GLOBAL</span>
           </a>
           
           {/* Desktop search wrapper */}
           <div className="search-input-wrapper desktop-only">
             <input
               type="text"
-              placeholder="Search products, brands, paste types..."
+              placeholder="Search products, brands, paste types, beverage..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -823,14 +990,20 @@ export default function App() {
                 }}
                 className="search-toggle-btn mobile-only"
                 title="Search"
+                style={{ color: "#1B4D2E" }}
               >
                 <Search className="w-5 h-5" />
               </button>
             )}
 
             {verifiedRetailer && (
-              <button id="cart-btn-header" onClick={() => { setIsCartOpen(true); setIsQuoteOpen(false); }} className="cart-icon-btn" title="Order List">
-                <ShoppingCart className="w-5 h-5" />
+              <button 
+                id="cart-btn-header" 
+                onClick={() => { setIsCartOpen(true); setIsQuoteOpen(false); }} 
+                className="cart-icon-btn" 
+                title="Direct Carton Order List"
+              >
+                <ShoppingCart className="w-5 h-5 text-emerald-900" />
                 {cart.filter(item => item.mode === "order").length > 0 && (
                   <span className="cart-badge">
                     {cart.filter(item => item.mode === "order").reduce((a, b) => a + b.quantity, 0)}
@@ -839,8 +1012,13 @@ export default function App() {
               </button>
             )}
 
-            <button id="quote-btn-header" onClick={() => { setIsQuoteOpen(true); setIsCartOpen(false); }} className={`cart-icon-btn ${verifiedRetailer ? "ml-2" : ""}`} title="Quote List">
-              <ClipboardList className="w-5 h-5" />
+            <button 
+              id="quote-btn-header" 
+              onClick={() => { setIsQuoteOpen(true); setIsCartOpen(false); }} 
+              className={`cart-icon-btn ${verifiedRetailer ? "ml-2" : ""}`} 
+              title="Pallet & Container Quote List"
+            >
+              <ClipboardList className="w-5 h-5 text-emerald-900" />
               {cart.filter(item => item.mode === "quote").length > 0 && (
                 <span className="cart-badge">
                   {cart.filter(item => item.mode === "quote").reduce((a, b) => a + b.quantity, 0)}
@@ -851,34 +1029,39 @@ export default function App() {
         </div>
       </header>
 
-      {/* Subheader: Buyer verification inputs */}
+      {/* Subheader: Retailer Verification Panel */}
       <div className="verification-panel">
         <div className="verification-container justify-center">
           {verifiedRetailer ? (
-            <div className="flex flex-col items-center justify-center w-full py-1 text-center gap-1 bg-orange-50 border border-orange-100 rounded-lg p-2">
-              <span className="text-sm font-bold text-orange-700">
-                Welcome, {verifiedRetailer.name || verifiedRetailer.display_name}
-              </span>
+            <div className="flex flex-col sm:flex-row items-center justify-between w-full py-1 text-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                <span className="text-xs font-bold text-emerald-950">
+                  Welcome, <strong className="text-emerald-800">{verifiedRetailer.name || verifiedRetailer.display_name}</strong>
+                </span>
+              </div>
               <button
                 onClick={handleClearRetailer}
-                className="btn-link"
+                className="btn-link text-emerald-700 hover:text-emerald-900 text-xs"
               >
-                (Not {verifiedRetailer.name || verifiedRetailer.display_name}? Change Buyer ID)
+                Not you? (Change Buyer ID)
               </button>
             </div>
           ) : (
             <form onSubmit={handleVerifyRetailer} className="flex flex-col md:flex-row justify-center items-center w-full gap-3 py-1 flex-wrap">
-              <span className="text-xs font-bold text-zinc-600">Enter Buyer ID to activate catalog:</span>
+              <div className="text-xs font-semibold text-zinc-700">
+                Enter Buyer ID for direct ordering:
+              </div>
               <div className="retailer-input-group justify-center">
                 <input
                   type="text"
-                  placeholder="Buyer ID"
+                  placeholder="eg: 30000000/A0001"
                   value={retailerInput}
                   onChange={(e) => setRetailerInput(e.target.value)}
                   disabled={verifying}
                 />
                 <button type="submit" disabled={verifying} className="btn-verify">
-                  {verifying ? "Verifying..." : "Verify"}
+                  {verifying ? "Verifying..." : "Verify ID"}
                 </button>
               </div>
             </form>
@@ -886,16 +1069,18 @@ export default function App() {
         </div>
       </div>
 
+      {/* Main Container */}
       <div className="main-wrapper">
+
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-md mb-4 flex items-center gap-2">
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-md mb-2 flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
             <span>{error}</span>
           </div>
         )}
-        {/* Sticky category tabs container */}
-        <div className="sticky-tabs-container">
-          {/* Category categories scrolling bar */}
+
+        {/* Sticky Category Filter Tabs */}
+        <div className="category-tabs-sticky-wrapper">
           <div className="brand-tabs-scroll tabs-scroll-center">
             {categories.map((c) => (
               <button
@@ -918,12 +1103,12 @@ export default function App() {
         {/* Catalog Lists loading block */}
         {loading ? (
           <div className="flex flex-col justify-center items-center py-20 gap-2">
-            <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-xs text-zinc-400 font-semibold">Loading Catalog...</p>
+            <div className="w-8 h-8 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-xs text-zinc-500 font-semibold">Loading HSG Global Catalog...</p>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-20 bg-white border border-zinc-200 rounded-md p-6">
-            <p className="text-sm text-zinc-400 italic">No products found matching your filter selections.</p>
+            <p className="text-sm text-zinc-500 italic">No products found matching your filter selections.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-6">
@@ -937,6 +1122,7 @@ export default function App() {
                   <div className="products-grid">
                     {list.map((p) => {
                       const meta = parseProductMeta(p);
+                      const specs = getProductB2BSpecs(p, meta);
                       return (
                         <div key={p.sku} className="product-card" onClick={() => handleOpenProduct(p)}>
                           <img
@@ -944,31 +1130,65 @@ export default function App() {
                             alt={p.display_name}
                             className="product-card-img"
                           />
-                           <div className="product-card-info">
+                          <div className="product-card-info">
                             <span className="product-card-title">{meta.Short_Title || p.display_name}</span>
-                            <span className="product-card-specs">Carton: {formatCarton(p.carton)}</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddToCart(p, 1, "quote", e);
-                              }}
-                              className="btn-card-quote"
-                              style={!verifiedRetailer ? { backgroundColor: "var(--primary)", color: "var(--white)", borderColor: "var(--primary)" } : undefined}
-                            >
-                              Get Quote
-                            </button>
                             
-                            {verifiedRetailer && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddToCart(p, 1, "order", e);
-                                }}
-                                className="btn-card-add"
-                              >
-                                + Add 1 Carton
-                              </button>
-                            )}
+                            {/* Minimalist 2-Column Specs Layout (No Table) */}
+                            <div className="product-card-specs-2col">
+                              <div className="specs-2col-left">
+                                <span className="specs-item">{specs.ctnPacking}</span>
+                                {specs.storageTier !== "-" && (
+                                  <span className="specs-item">{specs.storageTier}</span>
+                                )}
+                              </div>
+                              <div className="specs-2col-right">
+                                {specs.pltConfig !== "-" && (
+                                  <span className="specs-item">{specs.pltConfig}</span>
+                                )}
+                                {specs.shelfLife !== "-" && (
+                                  <span className="specs-item">{specs.shelfLife}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Action Buttons: Preserving Registered Retailer Direct Order + Quote */}
+                            <div className="flex flex-col gap-1 mt-2">
+                              {verifiedRetailer ? (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddToCart(p, 1, "order", e);
+                                    }}
+                                    className="btn-card-add"
+                                    style={{ backgroundColor: "#1B4D2E", color: "#ffffff", borderColor: "#1B4D2E" }}
+                                  >
+                                    Add to Order
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddToCart(p, 1, "quote", e);
+                                    }}
+                                    className="btn-card-quote text-xs py-1"
+                                    style={{ borderColor: "#E2E8F0", color: "#64748B", fontSize: "11px" }}
+                                  >
+                                    Get Quote
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToCart(p, 1, "quote", e);
+                                  }}
+                                  className="btn-card-quote"
+                                  style={{ backgroundColor: "#1B4D2E", color: "#ffffff", borderColor: "#1B4D2E" }}
+                                >
+                                  Get Quote
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -980,17 +1200,16 @@ export default function App() {
           </div>
         )}
 
-        {/* Terms and Conditions Footer - Shown only to verified visitors */}
+        {/* Terms and Conditions Footer - Shown to verified visitors */}
         {verifiedRetailer && (
           <footer className="tc-footer">
             <div className="tc-sticky-note">
-              <h4>Terms & Conditions</h4>
+              <h4>B2B Retailer Order Terms & Conditions</h4>
               <ul>
-                <li><strong>Delivery Timeline:</strong> Standard delivery completed within a maximum of 4 working days.</li>
-                <li><strong>Urgent Requests:</strong> Urgent delivery requirements must be negotiated directly prior to submission.</li>
-                <li><strong>Minimum Quantity:</strong> Orders are subject to a strict minimum of 4 cartons per delivery.</li>
-                <li><strong>Pricing:</strong> Item prices are based on established B2B commercial agreements.</li>
-                <li><strong>Payment Terms:</strong> Settlements must comply with established B2B contractual agreements.</li>
+                <li><strong>Delivery Timeline:</strong> Standard island-wide store delivery completed within 2 to 4 working days.</li>
+                <li><strong>Minimum Order Quantity (MOQ):</strong> Minimum 4 cartons combined per delivery location.</li>
+                <li><strong>Commercial Pricing:</strong> Invoiced based on your established B2B retail agreement tier.</li>
+                <li><strong>Settlement & Payment:</strong> In accordance with existing credit terms & contractual agreements.</li>
               </ul>
             </div>
           </footer>
@@ -998,100 +1217,182 @@ export default function App() {
 
       </div>
 
-      {/* Swipeable Product Detail Modal */}
+      {/* 2-Column Product Detail Modal with Gallery, Scrollable Specs, & Sticky Bottom Button */}
       {selectedProduct && (() => {
         const meta = parseProductMeta(selectedProduct);
+        const specs = getProductB2BSpecs(selectedProduct, meta);
         const imagesList = [
           selectedProduct.image,
-          ...(meta.Images || []).filter((img) => img !== selectedProduct.image)
-        ].filter(Boolean);
+          ...(Array.isArray(meta.Images) ? meta.Images : [])
+        ].filter((img, idx, arr) => img && arr.indexOf(img) === idx);
+
+        // Format carton dimensions
+        const hasDim = selectedProduct.carton_l_mm || selectedProduct.carton_w_mm || selectedProduct.carton_h_mm;
+        const cartonDims = hasDim 
+          ? `${selectedProduct.carton_l_mm || "-"} × ${selectedProduct.carton_w_mm || "-"} × ${selectedProduct.carton_h_mm || "-"} mm`
+          : "-";
+
         return (
           <div className="modal-overlay" onClick={() => setSelectedProduct(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => setSelectedProduct(null)} className="modal-close-btn">
+            <div className="product-modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => setSelectedProduct(null)} className="modal-close-btn" title="Close">
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="product-detail-hero">
-                <img
-                  src={imagesList[carouselIndex]}
-                  alt={selectedProduct.display_name}
-                  className="detail-carousel-img"
-                />
-                
-                {imagesList.length > 1 && (
-                  <div className="carousel-dots">
-                    {imagesList.map((_, i) => (
-                      <span
-                        key={i}
-                        onClick={() => setCarouselIndex(i)}
-                        className={`carousel-dot ${carouselIndex === i ? "active" : ""}`}
-                      ></span>
-                    ))}
+              {/* Scrollable Modal Content */}
+              <div className="product-modal-body-scroll">
+                <div className="product-modal-2col">
+                  {/* Left Column: Image Gallery */}
+                  <div className="modal-gallery">
+                    <div className="modal-main-img-wrap">
+                      <img
+                        src={imagesList[carouselIndex] || selectedProduct.image}
+                        alt={selectedProduct.display_name}
+                        className="modal-main-img"
+                      />
+                    </div>
+
+                    {/* Thumbnail Row (shown if more than 1 image) */}
+                    {imagesList.length > 1 && (
+                      <div className="modal-thumbnails-row">
+                        {imagesList.map((img, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setCarouselIndex(i)}
+                            className={`modal-thumbnail-btn ${carouselIndex === i ? "active" : ""}`}
+                            title={`View image ${i + 1}`}
+                          >
+                            <img src={img} alt={`Thumbnail ${i + 1}`} className="modal-thumbnail-img" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* Right Column: Product Info & Complete B2B Specs */}
+                  <div className="product-detail-body">
+                    <div className="product-detail-header-row">
+                      <span className="product-detail-brand">
+                        {brands.find((b) => b.id === selectedProduct.brands_id)?.display_name || "HSG GLOBAL"}
+                      </span>
+                      <span className="product-detail-sku">
+                        SKU: {selectedProduct.sku}
+                      </span>
+                    </div>
+                    
+                    <h3 className="product-detail-title">{meta.Title || selectedProduct.display_name}</h3>
+
+                    {/* Minimalist Seamless Logistics & Packaging Specs */}
+                    <div className="modal-specs-clean">
+                      <div className="specs-clean-grid">
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Unit (EA)</span>
+                          <span className="specs-clean-val">{specs.eaUnit}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Carton (CTN)</span>
+                          <span className="specs-clean-val">{specs.ctnPacking}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Single EAN</span>
+                          <span className="specs-clean-val font-mono text-[11px]">{selectedProduct.single_barcode || "-"}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Carton ITF</span>
+                          <span className="specs-clean-val font-mono text-[11px]">{selectedProduct.carton_barcode || "-"}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Carton Size</span>
+                          <span className="specs-clean-val">{cartonDims}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Carton Weight</span>
+                          <span className="specs-clean-val">{selectedProduct.carton_weight ? `${selectedProduct.carton_weight} kg` : "-"}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Pallet (PLT)</span>
+                          <span className="specs-clean-val">{specs.palletDisplay !== "-" ? `${specs.pltTotalCtn} CTN` : "-"}</span>
+                        </div>
+                        <div className="specs-clean-row">
+                          <span className="specs-clean-key">Shelf Life</span>
+                          <span className="specs-clean-val">{specs.shelfLife}</span>
+                        </div>
+                        <div className="specs-clean-row full-width">
+                          <span className="specs-clean-key">Storage Condition</span>
+                          <span className="specs-clean-val">{specs.storageTier}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {(meta.Long_Des || meta.Short_Des) && (
+                      <p className="product-detail-desc">{meta.Long_Des || meta.Short_Des}</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="product-detail-body">
-                <span className="product-detail-brand">
-                  {brands.find((b) => b.id === selectedProduct.brands_id)?.display_name}
-                </span>
-                <h3 className="product-detail-title">{meta.Title || selectedProduct.display_name}</h3>
-                
-                <div className="flex items-center gap-2">
-                  <span className="product-card-specs">SKU: {selectedProduct.sku}</span>
-                  <span className="product-card-specs">Carton: {formatCarton(selectedProduct.carton)}</span>
-                </div>
-
-                {/* Contact for Pricing is removed */}
-
-                <p className="product-detail-desc">{meta.Long_Des || meta.Short_Des}</p>
-
-                <div className="detail-buy-container">
-                  <div className="detail-qty-row">
-                    <span className="detail-qty-label">Quantity:</span>
-                    <div className="qty-counter">
-                      <button
-                        onClick={() => setDetailQty(Math.max(1, detailQty - 1))}
-                        className="qty-btn"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="qty-value">{detailQty}</span>
-                      <button
-                        onClick={() => setDetailQty(detailQty + 1)}
-                        className="qty-btn"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+              {/* Sticky Bottom Action Footer */}
+              <div className="product-modal-footer-sticky">
+                {verifiedRetailer ? (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-700 text-xs">Quantity:</span>
+                      <div className="qty-counter">
+                        <button
+                          onClick={() => setDetailQty(Math.max(1, detailQty - 1))}
+                          className="qty-btn"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="qty-value">{detailQty}</span>
+                        <button
+                          onClick={() => setDetailQty(detailQty + 1)}
+                          className="qty-btn"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    {verifiedRetailer && (
+                    <div className="flex gap-2 w-full sm:w-auto">
                       <button
                         onClick={(e) => {
                           handleAddToCart(selectedProduct, detailQty, "order", e);
                           setSelectedProduct(null);
                         }}
-                        className="btn-primary flex-grow"
+                        className="btn-primary flex-1 sm:flex-initial px-6"
+                        style={{ backgroundColor: "#1B4D2E" }}
                       >
-                        Add to Cart
+                        + Add {detailQty} Carton(s) to Order
                       </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        handleAddToCart(selectedProduct, detailQty, "quote", e);
-                        setSelectedProduct(null);
-                      }}
-                      className="btn-secondary flex-grow"
-                      style={{ borderColor: "var(--primary)", color: "var(--primary)" }}
-                    >
-                      Add to Quote
-                    </button>
+                      <button
+                        onClick={(e) => {
+                          handleAddToCart(selectedProduct, 1, "quote", e);
+                          setSelectedProduct(null);
+                        }}
+                        className="btn-secondary px-4"
+                        style={{ borderColor: "#1B4D2E", color: "#1B4D2E" }}
+                      >
+                        Get Quote
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      handleAddToCart(selectedProduct, 1, "quote", e);
+                      setSelectedProduct(null);
+                    }}
+                    className="btn-primary w-full py-2.5 text-sm font-semibold rounded"
+                    style={{ backgroundColor: "#1B4D2E", color: "#ffffff", borderColor: "#1B4D2E" }}
+                  >
+                    Get Quote
+                  </button>
+                )}
               </div>
+
             </div>
           </div>
         );
@@ -1107,8 +1408,8 @@ export default function App() {
             <h3 className="text-lg font-bold text-zinc-800">
               Order List ({cart.filter((item) => item.mode === "order").length})
             </h3>
-            <button onClick={() => setIsCartOpen(false)} className="p-1 rounded-full hover:bg-zinc-100">
-              <X className="w-5 h-5 text-zinc-500" />
+            <button onClick={() => setIsCartOpen(false)} className="p-1 rounded-full hover:bg-zinc-100 text-zinc-500">
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -1122,7 +1423,7 @@ export default function App() {
               cart.filter((item) => item.mode === "order").map((item) => {
                 const meta = parseProductMeta(item.product);
                 return (
-                  <div key={`${item.product.sku}_order`} className="cart-item">
+                  <div key={`${item.product.sku}_order`} className="cart-item relative" style={{ paddingRight: "26px" }}>
                     <img
                       src={item.product.image}
                       alt={item.product.display_name}
@@ -1132,7 +1433,7 @@ export default function App() {
                       <span className="cart-item-title">{meta.Short_Title || item.product.display_name}</span>
                       <span className="cart-item-sub">Carton: {formatCarton(item.product.carton)}</span>
                       
-                      <div className="flex justify-between items-center mt-2">
+                      <div className="flex items-center mt-2">
                         <div className="qty-counter">
                           <button
                             onClick={() => updateCartQty(item.product.sku, "order", item.quantity - 1)}
@@ -1148,15 +1449,16 @@ export default function App() {
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <button
-                          onClick={() => updateCartQty(item.product.sku, "order", 0)}
-                          className="btn-remove"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => updateCartQty(item.product.sku, "order", 0)}
+                      className="cart-item-remove-btn"
+                      title="Remove item"
+                    >
+                      <Trash2 />
+                    </button>
                   </div>
                 );
               })
@@ -1230,24 +1532,25 @@ export default function App() {
         >
           <div className="cart-drawer-header">
             <h3 className="text-lg font-bold text-zinc-800">
-              Quote List ({cart.filter((item) => item.mode === "quote").length})
+              Price Quote Inquiries ({cart.filter((item) => item.mode === "quote").length})
             </h3>
-            <button onClick={() => setIsQuoteOpen(false)} className="p-1 rounded-full hover:bg-zinc-100">
-              <X className="w-5 h-5 text-zinc-500" />
+            <button onClick={() => setIsQuoteOpen(false)} className="p-1 rounded-full hover:bg-zinc-100 text-zinc-500">
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           <div className="cart-drawer-body">
             {cart.filter((item) => item.mode === "quote").length === 0 ? (
-              <div className="flex-1 flex flex-col justify-center items-center gap-2 text-zinc-400 italic">
+              <div className="flex-1 flex flex-col justify-center items-center gap-2 text-zinc-400 italic py-12">
                 <ClipboardList className="w-8 h-8 text-zinc-300" />
-                <span>Your quote list is empty.</span>
+                <span>Your price quote inquiry list is empty.</span>
               </div>
             ) : (
               cart.filter((item) => item.mode === "quote").map((item) => {
                 const meta = parseProductMeta(item.product);
+                const specs = getProductB2BSpecs(item.product, meta);
                 return (
-                  <div key={`${item.product.sku}_quote`} className="cart-item">
+                  <div key={`${item.product.sku}_quote`} className="cart-item relative" style={{ paddingRight: "26px" }}>
                     <img
                       src={item.product.image}
                       alt={item.product.display_name}
@@ -1255,33 +1558,17 @@ export default function App() {
                     />
                     <div className="cart-item-info">
                       <span className="cart-item-title">{meta.Short_Title || item.product.display_name}</span>
-                      <span className="cart-item-sub">Carton: {formatCarton(item.product.carton)}</span>
-                      
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="qty-counter">
-                          <button
-                            onClick={() => updateCartQty(item.product.sku, "quote", item.quantity - 1)}
-                            className="qty-btn"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="qty-value">{item.quantity}</span>
-                          <button
-                            onClick={() => updateCartQty(item.product.sku, "quote", item.quantity + 1)}
-                            className="qty-btn"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => updateCartQty(item.product.sku, "quote", 0)}
-                          className="btn-remove"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <span className="cart-item-sub font-mono text-[10px] text-zinc-400">SKU: {item.product.sku}</span>
+                      <span className="cart-item-sub">Packing: {specs.ctnPacking}</span>
                     </div>
+
+                    <button
+                      onClick={() => updateCartQty(item.product.sku, "quote", 0)}
+                      className="cart-item-remove-btn"
+                      title="Remove item"
+                    >
+                      <Trash2 />
+                    </button>
                   </div>
                 );
               })
@@ -1291,8 +1578,8 @@ export default function App() {
           {cart.filter((item) => item.mode === "quote").length > 0 && (
             <div className="cart-drawer-footer">
               <div className="flex justify-between font-bold text-sm text-zinc-700">
-                <span>Total Cartons:</span>
-                <span>{cart.filter((item) => item.mode === "quote").reduce((a, b) => a + b.quantity, 0)} Ctn</span>
+                <span>Selected Items:</span>
+                <span>{cart.filter((item) => item.mode === "quote").length} Products</span>
               </div>
               <button
                 onClick={() => {
@@ -1303,7 +1590,7 @@ export default function App() {
                 className="btn-checkout"
                 style={{ backgroundColor: "var(--primary)" }}
               >
-                Proceed Quote
+                Get Quote
               </button>
             </div>
           )}
@@ -1336,7 +1623,7 @@ export default function App() {
             {verifiedRetailer ? (
               // BUYER CHECKOUT FORM
               <div className="flex flex-col gap-3">
-                <div className="bg-orange-50 border border-orange-200 rounded p-3 text-xs text-orange-800">
+                <div className="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs text-emerald-900">
                   <strong>Verified Buyer:</strong> {verifiedRetailer.display_name || verifiedRetailer.name}
                 </div>
 
@@ -1635,13 +1922,14 @@ function ThankYouPage({
         <div style={{
           width: "64px",
           height: "64px",
-          backgroundColor: "#ffebd8",
+          backgroundColor: "#F0FDF4",
           borderRadius: "50%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#ff6f00",
-          boxShadow: "inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)"
+          color: "#1B4D2E",
+          boxShadow: "inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)",
+          border: "1px solid #DCFCE7"
         }}>
           <CheckCircle2 style={{ width: "36px", height: "36px" }} />
         </div>
@@ -1686,7 +1974,7 @@ function ThankYouPage({
           <span style={{ color: "#71717a", fontSize: "12px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             {data.type === "order" ? "Order Number" : "Request Number"}
           </span>
-          <span style={{ color: "#18181b", fontWeight: "800", fontSize: "18px", letterSpacing: "0.5px" }}>
+          <span style={{ color: "#1B4D2E", fontWeight: "800", fontSize: "18px", letterSpacing: "0.5px" }}>
             {data.id}
           </span>
         </div>
@@ -1723,7 +2011,7 @@ function ThankYouPage({
             
             {isMobile ? (
               <p style={{ color: "#71717a", fontSize: "12px", fontWeight: "600", margin: 0 }}>
-                Redirecting to WhatsApp in <span style={{ color: "#ff6f00", fontWeight: "700" }}>{countdown}</span> seconds...
+                Redirecting to WhatsApp in <span style={{ color: "#1B4D2E", fontWeight: "700" }}>{countdown}</span> seconds...
               </p>
             ) : (
               <p style={{ color: "#71717a", fontSize: "12px", lineHeight: "1.4", margin: 0, maxWidth: "320px", textAlign: "center" }}>
