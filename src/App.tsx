@@ -216,7 +216,6 @@ export default function App() {
   const [custPhone, setCustPhone] = React.useState("");
   const [custEmail, setCustEmail] = React.useState("");
   const [custAddress, setCustAddress] = React.useState("");
-  const [custPostcode, setCustPostcode] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [submitType, setSubmitType] = React.useState<"order" | "quote">("order");
 
@@ -559,7 +558,7 @@ export default function App() {
         payload.customer_phone = custPhone.trim();
         payload.customer_email = custEmail.trim();
         payload.address = custAddress.trim();
-        payload.postcode = custPostcode.trim();
+        payload.postcode = "";
       }
 
       const res = await fetch(`${BACKEND_URL}/api/public/order/submit`, {
@@ -1745,22 +1744,12 @@ export default function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Delivery/Billing Address:</label>
+                  <label>Company Name (Optional):</label>
                   <input
                     type="text"
                     value={custAddress}
                     onChange={(e) => setCustAddress(e.target.value)}
-                    placeholder="e.g. Blk 123 Toa Payoh Lorong 1 (Optional)"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Postal Code:</label>
-                  <input
-                    type="text"
-                    value={custPostcode}
-                    onChange={(e) => setCustPostcode(e.target.value)}
-                    placeholder="e.g. 310123 (Optional)"
+                    placeholder="e.g. Acme Supermarket Pte Ltd"
                   />
                 </div>
               </div>
