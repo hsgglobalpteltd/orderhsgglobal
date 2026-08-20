@@ -1,7 +1,7 @@
 {
-  "name": "HSG Global Product Catalog - Request a Quote",
-  "short_name": "HSG Catalog",
-  "description": "Browse the complete HSG Global product catalog. Explore our B2B selection and easily request a custom quote for your business needs.",
+  "name": "HSG Global B2B Ordering & Product Catalog",
+  "short_name": "HSG Ordering",
+  "description": "Browse the complete HSG Global product catalog. Explore our B2B selection and easily request a custom quote or place orders for your business needs.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
