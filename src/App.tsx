@@ -10,8 +10,10 @@ import {
   Trash2, 
   ClipboardList, 
   CheckCircle2, 
-  MessageSquare
+  MessageSquare,
+  Image as ImageIcon
 } from "lucide-react";
+import { ChatAssist } from "./ChatAssist";
 
 interface ProductMeta {
   Title: string;
@@ -113,6 +115,210 @@ export function getProductB2BSpecs(product: Product, meta: ProductMeta): B2BSpec
     exportMoq: "1 Full Pallet (PLT) / LCL / FCL Container Load",
     certifications: ["Halal Certified", "HACCP Food Safety", "Distributed by HSG Global"]
   };
+}
+
+// Helper to get optimized thumbnail image URL (fast loading)
+export function getThumbnailUrl(url?: string): string {
+  if (!url) return "https://images.unsplash.com/photo-1547592180-85f173990554?w=350&auto=format&fit=crop&q=70";
+  
+  // Imgur URLs (use 'm' suffix for medium 320x320 thumbnail)
+  if (url.includes("i.imgur.com/")) {
+    const match = url.match(/^https:\/\/i\.imgur\.com\/([a-zA-Z0-9]+)(\.[a-zA-Z0-9]+)$/);
+    if (match) {
+      const id = match[1];
+      const ext = match[2];
+      if (!/[sbtmlh]$/i.test(id)) {
+        return `https://i.imgur.com/${id}m${ext}`;
+      }
+    }
+  }
+
+  // Unsplash URLs
+  if (url.includes("images.unsplash.com")) {
+    try {
+      const u = new URL(url);
+      u.searchParams.set("w", "350");
+      u.searchParams.set("q", "75");
+      u.searchParams.set("auto", "format");
+      u.searchParams.set("fit", "crop");
+      return u.toString();
+    } catch {}
+  }
+
+  return url;
+}
+
+// Helper to get full resolution image URL
+export function getFullImageUrl(url?: string): string {
+  if (!url) return "https://images.unsplash.com/photo-1547592180-85f173990554?w=1200&auto=format&fit=crop&q=85";
+
+  // Imgur URLs: revert thumbnail suffix if any to load original full image
+  if (url.includes("i.imgur.com/")) {
+    const match = url.match(/^https:\/\/i\.imgur\.com\/([a-zA-Z0-9]+)([sbtmlh])(\.[a-zA-Z0-9]+)$/i);
+    if (match) {
+      return `https://i.imgur.com/${match[1]}${match[3]}`;
+    }
+  }
+
+  // Unsplash URLs: set higher resolution
+  if (url.includes("images.unsplash.com")) {
+    try {
+      const u = new URL(url);
+      u.searchParams.set("w", "1200");
+      u.searchParams.set("q", "85");
+      u.searchParams.set("auto", "format");
+      return u.toString();
+    } catch {}
+  }
+
+  return url;
+}
+
+// Smooth Green Light 1:1 Aspect Ratio Fallback for missing/broken images
+function ImageFallback({
+  alt,
+  className,
+  size = "md"
+}: {
+  alt?: string;
+  className?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  return (
+    <div
+      className={`aspect-square w-full h-full bg-[#F0FDF4] border border-[#DCFCE7] flex flex-col items-center justify-center text-center p-2 select-none ${className || ""}`}
+    >
+      <div className={`${size === "sm" ? "w-6 h-6" : size === "lg" ? "w-12 h-12" : "w-8 h-8"} rounded-full bg-[#DCFCE7] flex items-center justify-center text-[#1B4D2E] mb-1 shrink-0`}>
+        <ImageIcon className={`${size === "sm" ? "w-3 h-3" : size === "lg" ? "w-6 h-6" : "w-4 h-4"} opacity-80`} />
+      </div>
+      {alt && size !== "sm" && (
+        <span className="text-[10px] font-semibold text-[#1B4D2E] line-clamp-2 px-1 opacity-70 leading-tight">
+          {alt}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Product Card Image Component for Catalog Grid with Fallback
+function ProductCardImage({
+  src,
+  alt,
+  className
+}: {
+  src?: string;
+  alt: string;
+  className?: string;
+}) {
+  const [hasError, setHasError] = React.useState(!src);
+  const thumbUrl = React.useMemo(() => getThumbnailUrl(src), [src]);
+
+  React.useEffect(() => {
+    setHasError(!src);
+  }, [src]);
+
+  if (hasError || !src) {
+    return <ImageFallback alt={alt} className={className} />;
+  }
+
+  return (
+    <img
+      src={thumbUrl}
+      alt={alt}
+      className={className || "product-card-img"}
+      loading="lazy"
+      decoding="async"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
+// Progressive Image Loader for Detail Modal with Fallback
+function ProgressiveProductImage({
+  src,
+  alt,
+  className
+}: {
+  src?: string;
+  alt: string;
+  className?: string;
+}) {
+  const thumbUrl = React.useMemo(() => getThumbnailUrl(src), [src]);
+  const fullUrl = React.useMemo(() => getFullImageUrl(src), [src]);
+  const [currentSrc, setCurrentSrc] = React.useState(thumbUrl);
+  const [hasError, setHasError] = React.useState(!src);
+
+  React.useEffect(() => {
+    setHasError(!src);
+    setCurrentSrc(thumbUrl);
+    if (!fullUrl || fullUrl === thumbUrl || !src) return;
+
+    const img = new Image();
+    img.src = fullUrl;
+    img.onload = () => {
+      setCurrentSrc(fullUrl);
+    };
+    img.onerror = () => {
+      if (!thumbUrl) setHasError(true);
+    };
+  }, [src, thumbUrl, fullUrl]);
+
+  if (hasError || !src) {
+    return <ImageFallback alt={alt} className={className} size="lg" />;
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={className || "modal-main-img"}
+      loading="eager"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
+// Gallery Thumbnail with Fallback
+function GalleryThumbnail({
+  src,
+  alt,
+  isActive,
+  onClick
+}: {
+  src: string;
+  alt: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const [hasError, setHasError] = React.useState(!src);
+
+  React.useEffect(() => {
+    setHasError(!src);
+  }, [src]);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`modal-thumbnail-btn ${isActive ? "active" : ""}`}
+      title={alt}
+    >
+      {hasError || !src ? (
+        <div className="w-full h-full bg-[#F0FDF4] border border-[#DCFCE7] flex items-center justify-center text-[#1B4D2E] rounded">
+          <ImageIcon className="w-3.5 h-3.5 opacity-70" />
+        </div>
+      ) : (
+        <img
+          src={getThumbnailUrl(src)}
+          alt={alt}
+          className="modal-thumbnail-img"
+          loading="lazy"
+          decoding="async"
+          onError={() => setHasError(true)}
+        />
+      )}
+    </button>
+  );
 }
 
 const BACKEND_URL = "https://ib-v2.hsgglobalpteltd.workers.dev";
@@ -343,6 +549,36 @@ export default function App() {
     } else {
       fetchCatalog();
     }
+
+    // Auto-refresh verified buyer session data in the background
+    try {
+      const saved = localStorage.getItem("hsg_verified_retailer_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const rId = parsed.retailer?.id || parsed.retailerInput;
+        if (rId) {
+          fetch(`${BACKEND_URL}/api/public/retailer?id=${encodeURIComponent(rId)}`)
+            .then((res) => res.json())
+            .then((data) => {
+              if (data && data.found && data.retailer) {
+                setVerifiedRetailer(data.retailer);
+                setRetailerStores(data.stores || []);
+                setRetailerSkus(data.skus || []);
+                localStorage.setItem(
+                  "hsg_verified_retailer_session",
+                  JSON.stringify({
+                    retailer: data.retailer,
+                    stores: data.stores || [],
+                    skus: data.skus || [],
+                    retailerInput: rId
+                  })
+                );
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {}
   }, [orderIdParam, quoteIdParam, fetchCatalog, fetchTracking]);
 
   // Handle Retailer ID verification
@@ -372,7 +608,7 @@ export default function App() {
             })
           );
         } catch {}
-        showToast("Retailer verified successfully!", "success");
+        showToast("Buyer verified successfully!", "success");
       } else {
         setVerifiedRetailer(null);
         setRetailerStores([]);
@@ -380,7 +616,7 @@ export default function App() {
         try {
           localStorage.removeItem("hsg_verified_retailer_session");
         } catch {}
-        showToast("Invalid Retailer ID. Please try again.", "error");
+        showToast("Invalid Buyer ID. Please try again.", "error");
       }
     } catch {
       showToast("Verification failed. Please try again.", "error");
@@ -1124,7 +1360,7 @@ export default function App() {
                       const specs = getProductB2BSpecs(p, meta);
                       return (
                         <div key={p.sku} className="product-card" onClick={() => handleOpenProduct(p)}>
-                          <img
+                          <ProductCardImage
                             src={p.image}
                             alt={p.display_name}
                             className="product-card-img"
@@ -1199,20 +1435,64 @@ export default function App() {
           </div>
         )}
 
-        {/* Terms and Conditions Footer - Shown to verified visitors */}
-        {verifiedRetailer && (
-          <footer className="tc-footer">
-            <div className="tc-sticky-note">
-              <h4>B2B Retailer Order Terms & Conditions</h4>
-              <ul>
-                <li><strong>Delivery Timeline:</strong> Standard island-wide store delivery completed within 2 to 4 working days.</li>
-                <li><strong>Minimum Order Quantity (MOQ):</strong> Minimum 4 cartons combined per delivery location.</li>
-                <li><strong>Commercial Pricing:</strong> Invoiced based on your established B2B retail agreement tier.</li>
-                <li><strong>Settlement & Payment:</strong> In accordance with existing credit terms & contractual agreements.</li>
-              </ul>
-            </div>
-          </footer>
-        )}
+        {/* Dynamic Terms and Conditions Footer - Stored in retailer_db, hidden if no data */}
+        {(() => {
+          if (!verifiedRetailer) return null;
+
+          // Find terms from any variations of column names
+          const rawTerms =
+            verifiedRetailer.terms ||
+            verifiedRetailer.Terms ||
+            verifiedRetailer.terms_and_conditions ||
+            verifiedRetailer["Terms & Conditions"] ||
+            verifiedRetailer["Terms and Conditions"] ||
+            verifiedRetailer.order_terms ||
+            verifiedRetailer.Order_Terms ||
+            verifiedRetailer.tc ||
+            verifiedRetailer.TC ||
+            verifiedRetailer.tnc ||
+            verifiedRetailer.TNC ||
+            verifiedRetailer.notes ||
+            verifiedRetailer.Notes ||
+            verifiedRetailer.remarks ||
+            verifiedRetailer.Remarks ||
+            "";
+
+          if (typeof rawTerms !== "string" || !rawTerms.trim()) {
+            return null; // Zero fallback - hide completely when no data
+          }
+
+          // Split by '/' or newline into separate bullet items
+          const bullets = rawTerms
+            .split(/[\/\n]+/)
+            .map((b) => b.trim())
+            .filter(Boolean);
+
+          if (bullets.length === 0) return null;
+
+          return (
+            <footer className="tc-footer">
+              <div className="tc-sticky-note">
+                <h4>Buyer Order Terms & Conditions</h4>
+                <ul>
+                  {bullets.map((bullet, idx) => {
+                    const colonIndex = bullet.indexOf(":");
+                    if (colonIndex > 0 && colonIndex < 40) {
+                      const label = bullet.substring(0, colonIndex + 1);
+                      const value = bullet.substring(colonIndex + 1);
+                      return (
+                        <li key={idx}>
+                          <strong>{label}</strong>{value}
+                        </li>
+                      );
+                    }
+                    return <li key={idx}>{bullet}</li>;
+                  })}
+                </ul>
+              </div>
+            </footer>
+          );
+        })()}
 
       </div>
 
@@ -1244,7 +1524,7 @@ export default function App() {
                   {/* Left Column: Image Gallery */}
                   <div className="modal-gallery">
                     <div className="modal-main-img-wrap">
-                      <img
+                      <ProgressiveProductImage
                         src={imagesList[carouselIndex] || selectedProduct.image}
                         alt={selectedProduct.display_name}
                         className="modal-main-img"
@@ -1255,15 +1535,13 @@ export default function App() {
                     {imagesList.length > 1 && (
                       <div className="modal-thumbnails-row">
                         {imagesList.map((img, i) => (
-                          <button
+                          <GalleryThumbnail
                             key={i}
-                            type="button"
+                            src={img}
+                            alt={`Thumbnail ${i + 1}`}
+                            isActive={carouselIndex === i}
                             onClick={() => setCarouselIndex(i)}
-                            className={`modal-thumbnail-btn ${carouselIndex === i ? "active" : ""}`}
-                            title={`View image ${i + 1}`}
-                          >
-                            <img src={img} alt={`Thumbnail ${i + 1}`} className="modal-thumbnail-img" />
-                          </button>
+                          />
                         ))}
                       </div>
                     )}
@@ -1407,8 +1685,8 @@ export default function App() {
             <h3 className="text-lg font-bold text-zinc-800">
               Order List ({cart.filter((item) => item.mode === "order").length})
             </h3>
-            <button onClick={() => setIsCartOpen(false)} className="p-1 rounded-full hover:bg-zinc-100 text-zinc-500">
-              <X className="w-5 h-5" />
+            <button onClick={() => setIsCartOpen(false)} className="drawer-close-btn" title="Close" aria-label="Close">
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -1533,8 +1811,8 @@ export default function App() {
             <h3 className="text-lg font-bold text-zinc-800">
               Price Quote Inquiries ({cart.filter((item) => item.mode === "quote").length})
             </h3>
-            <button onClick={() => setIsQuoteOpen(false)} className="p-1 rounded-full hover:bg-zinc-100 text-zinc-500">
-              <X className="w-5 h-5" />
+            <button onClick={() => setIsQuoteOpen(false)} className="drawer-close-btn" title="Close" aria-label="Close">
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -1837,6 +2115,9 @@ export default function App() {
           <span>{toast.message}</span>
         </div>
       )}
+
+      {/* Floating Customer Service Chat Assist Widget */}
+      <ChatAssist />
 
     </div>
   );

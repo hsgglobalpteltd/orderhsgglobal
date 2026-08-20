@@ -24,10 +24,19 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
   }
 
   .brand-title {
+    flex: initial !important;
+    min-width: auto !important;
     font-size: 1.05rem;
+  }
+
+  .header-actions {
+    flex: initial !important;
+    min-width: auto !important;
+    gap: 8px !important;
   }
 
   .brand-title img {
@@ -65,7 +74,7 @@
   }
 
   .main-wrapper {
-    padding: 8px 12px 24px 12px;
+    padding: 8px 12px calc(env(safe-area-inset-bottom, 0px) + 140px) 12px !important;
     gap: 12px;
     width: 100%;
     max-width: 100%;
@@ -185,6 +194,11 @@
   .modal-overlay {
     padding: 0;
     align-items: flex-end;
+    z-index: 10000 !important;
+  }
+
+  .cart-drawer {
+    z-index: 10001 !important;
   }
 
   .product-modal-dialog {
@@ -209,5 +223,30 @@
 
   .product-modal-footer-sticky {
     padding: 12px 16px;
+  }
+
+  /* Chat Assist Mobile Round Button & Positioning above bottom sticky bar */
+  .cs-float-container {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 74px) !important;
+    right: 14px !important;
+    z-index: 900 !important;
+  }
+
+  .cs-launcher-btn {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+  }
+
+  .cs-chat-window {
+    width: calc(100vw - 20px) !important;
+    max-width: 360px !important;
+    height: 500px !important;
+    max-height: calc(100vh - 80px) !important;
+    right: 10px !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+    border-radius: 14px !important;
+    z-index: 999 !important;
   }
 }
