@@ -36,7 +36,17 @@
   .header-actions {
     flex: initial !important;
     min-width: auto !important;
-    gap: 8px !important;
+    gap: 6px !important;
+  }
+
+  .visit-site-btn {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+    border-radius: 6px !important;
+  }
+
+  .visit-site-text {
+    font-size: 0.68rem !important;
   }
 
   .brand-title img {

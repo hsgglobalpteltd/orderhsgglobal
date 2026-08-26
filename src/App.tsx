@@ -11,7 +11,9 @@ import {
   ClipboardList, 
   CheckCircle2, 
   MessageSquare,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Globe,
+  ArrowUpRight
 } from "lucide-react";
 import { ChatAssist } from "./ChatAssist";
 
@@ -1214,6 +1216,17 @@ export default function App() {
           </div>
 
           <div className="header-actions">
+            {/* Visit HSG Global Corporate Website */}
+            <a
+              href="https://hsgglobal.sg"
+              className="visit-site-btn"
+              title="Visit HSG Global Official Website (hsgglobal.sg)"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-800 shrink-0" />
+              <span className="visit-site-text font-bold text-xs text-emerald-950">Visit Website</span>
+              <ArrowUpRight className="w-3 h-3 text-emerald-700 shrink-0 opacity-70 desktop-only" />
+            </a>
+
             {/* Mobile search toggle */}
             {!showMobileSearch && (
               <button
