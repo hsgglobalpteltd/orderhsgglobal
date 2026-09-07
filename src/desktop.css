@@ -1171,19 +1171,58 @@ header {
 }
 
 .btn-print-summary {
-  background-color: #222;
-  color: var(--white);
-  border: none;
-  padding: 10px;
-  border-radius: 4px;
+  background-color: #1B4D2E;
+  color: #ffffff;
+  border: 1px solid #1B4D2E;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   margin-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(27, 77, 46, 0.2);
+}
+
+.btn-print-summary:hover {
+  background-color: #143C23;
+  border-color: #143C23;
+  transform: translateY(-1px);
+}
+
+.btn-return-catalog {
+  background-color: #ffffff;
+  color: #334155;
+  border: 1px solid #CBD5E1;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.btn-return-catalog:hover {
+  background-color: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
 }
 
 /* Printable PDF/PO stylesheet using @media print */
@@ -1234,6 +1273,8 @@ header {
 .justify-between { justify-content: space-between; }
 .items-center { align-items: center; }
 .text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
 .font-bold { font-weight: 700; }
 .font-semibold { font-weight: 600; }
 .font-medium { font-weight: 500; }

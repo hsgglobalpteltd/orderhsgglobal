@@ -13,9 +13,12 @@ import {
   MessageSquare,
   Image as ImageIcon,
   Globe,
-  ArrowUpRight
+  ArrowUpRight,
+  ArrowLeft
 } from "lucide-react";
 import { ChatAssist } from "./ChatAssist";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface ProductMeta {
   Title: string;
@@ -1044,17 +1047,55 @@ export default function App() {
     } catch {}
 
     return (
-      <div className="min-h-screen bg-zinc-100 py-6 px-4">
-        <div className="tracking-wrapper">
-          <div className="tracking-header" style={{ backgroundColor: "#1B4D2E" }}>
-            <div className="flex items-center justify-center gap-2">
-              <img src="/hsg_logo.png" alt="HSG Global" className="h-5 w-5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              <h2 className="text-xl font-bold text-white tracking-wide">HSG GLOBAL</h2>
+      <div style={{
+        minHeight: "100vh",
+        backgroundColor: "#F8FAFC",
+        padding: "32px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box"
+      }}>
+        <div style={{
+          width: "100%",
+          maxWidth: "680px",
+          backgroundColor: "#ffffff",
+          borderRadius: "16px",
+          border: "1px solid #E2E8F0",
+          boxShadow: "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
+          overflow: "hidden",
+          boxSizing: "border-box"
+        }}>
+          {/* Redesigned Clean Header */}
+          <div style={{
+            backgroundColor: "#ffffff",
+            borderBottom: "1px solid #F1F5F9",
+            padding: "24px 20px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "6px" }}>
+              <img 
+                src="/hsg_logo.png" 
+                alt="HSG Global" 
+                style={{ height: "28px", width: "28px", objectFit: "contain", flexShrink: 0 }}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+              />
+              <span style={{ fontSize: "18px", fontWeight: "900", letterSpacing: "-0.5px", color: "#064E3B", lineHeight: 1 }}>
+                HSG GLOBAL
+              </span>
             </div>
-            <p className="text-xs text-emerald-100 mt-1">B2B Order Tracking & Commercial Summary</p>
+            <h1 style={{ fontSize: "14px", fontWeight: "700", color: "#0F172A", margin: "4px 0 2px 0" }}>
+              B2B Order & Commercial Summary
+            </h1>
+            <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>
+              Real-time fulfillment tracking and document verification
+            </p>
           </div>
 
-          <div className="tracking-body">
+          <div style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: "18px", boxSizing: "border-box" }}>
             <div className={`tracking-status-bar ${isCompleted ? "completed" : ""}`}>
               <span>STATUS:</span>
               <span className="text-sm uppercase">{(rec.status || "PENDING").toUpperCase()}</span>
@@ -1113,35 +1154,260 @@ export default function App() {
               )}
             </div>
 
-            <div className="tracking-items-list">
-              <h4 className="text-xs font-bold text-zinc-800 uppercase tracking-wider mb-2">Itemised Packaging & Order List</h4>
-              {parsedItems.map((item, idx) => {
-                // Find local details
-                const prod = products.find((p) => p.sku === item.sku);
-                const title = prod ? parseProductMeta(prod).Short_Title : item.sku;
-                return (
-                  <div key={idx} className="tracking-item-row">
-                    <span className="tracking-item-name">{title}</span>
-                    <span className="tracking-item-qty">{item.carton_qty || item.qty} Carton(s)</span>
-                  </div>
-                );
-              })}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <h4 style={{ fontSize: "12px", fontWeight: "700", color: "#0F172A", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+                Order List
+              </h4>
+              
+              <div style={{ border: "1px solid #E2E8F0", borderRadius: "8px", overflow: "hidden", backgroundColor: "#ffffff" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#475569", fontWeight: "700" }}>
+                      <th style={{ padding: "8px 12px", textAlign: "left", width: "130px" }}>SKU</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left" }}>Product Description</th>
+                      <th style={{ padding: "8px 12px", textAlign: "center", width: "90px", whiteSpace: "nowrap" }}>Qty Ctn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedItems.map((item, idx) => {
+                      const prod = products.find((p) => p.sku === item.sku);
+                      const title = prod ? parseProductMeta(prod).Short_Title : (item.name || item.sku);
+                      const qty = item.carton_qty || item.qty || 0;
+                      return (
+                        <tr key={idx} style={{ borderBottom: idx === parsedItems.length - 1 ? "none" : "1px solid #F1F5F9" }}>
+                          <td style={{ padding: "10px 12px", textAlign: "left", fontFamily: "monospace", fontSize: "11px", fontWeight: "700", color: "#334155" }}>
+                            {item.sku || "-"}
+                          </td>
+                          <td style={{ padding: "10px 12px", textAlign: "left", fontWeight: "500", color: "#0F172A" }}>
+                            {title}
+                          </td>
+                          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: "700", color: "#0F172A", whiteSpace: "nowrap" }}>
+                            {qty} Ctn
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <button
-              onClick={() => window.print()}
+              onClick={() => {
+                const doc = new jsPDF({
+                  orientation: "portrait",
+                  unit: "mm",
+                  format: "a4"
+                });
+
+                const pageWidth = 210;
+                const margin = 14;
+
+                // 1. Header (Clean Corporate High-Contrast Print Ready)
+                doc.setTextColor(0, 0, 0);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(16);
+                doc.text("HSG GLOBAL PTE LTD", margin, 17);
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(0, 0, 0);
+                doc.text("PURCHASE ORDER SUMMARY", margin, 23);
+
+                // Top Right Reference & Date
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(0, 0, 0);
+                doc.text(`REF: ${rec.id || "-"}`, pageWidth - margin, 17, { align: "right" });
+
+                doc.setFontSize(8.5);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(0, 0, 0);
+                const printDateStr = new Date().toLocaleDateString("en-SG", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                });
+                doc.text(`Date: ${printDateStr}`, pageWidth - margin, 23, { align: "right" });
+
+                // Clean Solid Divider Line
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.line(margin, 27, pageWidth - margin, 27);
+
+                // 2. Structured Metadata Grid
+                const buyerName = rec.retailer_name || rec.customer_name || "N/A";
+                const buyerId = rec.retailer_id ? ` (${rec.retailer_id})` : "";
+                const addressFull = rec.address ? `${rec.address}${rec.postcode ? ` (${rec.postcode})` : ""}` : "N/A";
+                const statusStr = String(rec.status || "PENDING").toUpperCase();
+
+                const metaRows: any[] = [
+                  [
+                    { content: "Buyer / Retailer:" },
+                    { content: `${buyerName}${buyerId}`, styles: { fontStyle: "bold" } },
+                    { content: "Date Placed:" },
+                    { content: String(dateStr || "N/A") }
+                  ],
+                  [
+                    { content: "Delivery Address:" },
+                    { content: addressFull },
+                    { content: "Status:" },
+                    { content: statusStr, styles: { fontStyle: "bold" } }
+                  ]
+                ];
+
+                if (isCompleted && rec.invoice_number) {
+                  metaRows.push([
+                    { content: "Invoice No:" },
+                    { content: String(rec.invoice_number), styles: { fontStyle: "bold" } },
+                    { content: "Invoice Amount:" },
+                    { content: `$${Number(rec.invoice_amount || 0).toFixed(2)}`, styles: { fontStyle: "bold" } }
+                  ]);
+                }
+
+                autoTable(doc, {
+                  startY: 32,
+                  theme: "plain",
+                  styles: {
+                    fontSize: 9,
+                    cellPadding: { top: 1.5, bottom: 1.5, left: 1, right: 1 },
+                    textColor: [0, 0, 0],
+                    overflow: "linebreak"
+                  },
+                  columnStyles: {
+                    0: { cellWidth: 28, fontStyle: "bold", textColor: [0, 0, 0] },
+                    1: { cellWidth: 72 },
+                    2: { cellWidth: 26, fontStyle: "bold", textColor: [0, 0, 0] },
+                    3: { cellWidth: 56 }
+                  },
+                  body: metaRows,
+                  margin: { left: margin, right: margin }
+                });
+
+                let curY = (doc as any).lastAutoTable?.finalY || 48;
+                curY += 7;
+
+                // 3. Section Title
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(0, 0, 0);
+                doc.text("ORDER ITEMS SUMMARY", margin, curY);
+
+                // 4. Table Data & Total Calculation
+                let totalCartons = 0;
+                const tableRows = parsedItems.map((item) => {
+                  const prod = products.find((p) => p.sku === item.sku);
+                  const title = prod ? parseProductMeta(prod).Short_Title : (item.name || item.sku || "");
+                  const qty = Number(item.carton_qty || item.qty || 0);
+                  totalCartons += qty;
+                  return [
+                    item.sku || "-",
+                    title,
+                    String(qty)
+                  ];
+                });
+
+                const footerRow = [
+                  { content: "TOTAL", colSpan: 2, styles: { halign: "right", fontStyle: "bold", fontSize: 9.5 } },
+                  { content: `${totalCartons}`, styles: { halign: "center", fontStyle: "bold", fontSize: 9.5 } }
+                ];
+
+                autoTable(doc, {
+                  startY: curY + 3,
+                  head: [["SKU", "Description", "Qty Ctn"]],
+                  body: [...tableRows, footerRow as any],
+                  theme: "plain",
+                  headStyles: {
+                    fillColor: [245, 245, 245],
+                    textColor: [0, 0, 0],
+                    fontStyle: "bold",
+                    fontSize: 8.5,
+                    cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+                    lineWidth: 0.3,
+                    lineColor: [0, 0, 0]
+                  },
+                  bodyStyles: {
+                    textColor: [0, 0, 0],
+                    fontSize: 8,
+                    cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+                    lineWidth: 0.2,
+                    lineColor: [0, 0, 0]
+                  },
+                  columnStyles: {
+                    0: { cellWidth: 38, fontStyle: "bold", halign: "left" },
+                    1: { cellWidth: "auto", halign: "left" },
+                    2: { cellWidth: 30, halign: "center", fontStyle: "bold" }
+                  },
+                  margin: { left: margin, right: margin }
+                });
+
+                // 5. Footer Note
+                const finalY = (doc as any).lastAutoTable?.finalY || 160;
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "italic");
+                doc.setTextColor(0, 0, 0);
+                doc.text(
+                  "* This document is an itemized purchase order summary generated from HSG Global Direct Ordering.",
+                  margin,
+                  finalY + 8
+                );
+
+                // Generate Blob URL and open in new tab
+                const blob = doc.output("blob");
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, "_blank");
+              }}
               className="btn-print-summary"
+              style={{
+                height: "42px",
+                minHeight: "42px",
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                width: "100%",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                backgroundColor: "#1B4D2E",
+                color: "#ffffff",
+                border: "1px solid #1B4D2E",
+                marginTop: "12px",
+                boxShadow: "0 1px 3px rgba(27, 77, 46, 0.2)"
+              }}
             >
-              <Printer className="w-4 h-4" /> Print Commercial Slip
+              <Printer className="w-4 h-4" /> Print Purchase Order
             </button>
 
             <button
               onClick={() => {
                 window.location.href = window.location.origin;
               }}
-              className="btn-print-summary bg-zinc-600 hover:bg-zinc-700 mt-2 text-white"
+              className="btn-return-catalog"
+              style={{
+                height: "42px",
+                minHeight: "42px",
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                width: "100%",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                backgroundColor: "#ffffff",
+                color: "#334155",
+                border: "1px solid #CBD5E1",
+                marginTop: "8px"
+              }}
             >
-              Return to Catalog
+              <ArrowLeft className="w-4 h-4" /> Return to Catalog
             </button>
           </div>
         </div>
